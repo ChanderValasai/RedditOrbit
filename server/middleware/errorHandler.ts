@@ -4,7 +4,7 @@ import { config } from '../config/env';
 
 /**
  * Centralized error handling middleware.
- * Formats errors consistently for all client requests.
+ * Formats errors consistently for all client requests and outputs structured [API ERROR] logs.
  */
 export function errorHandler(
   err: any,
@@ -17,10 +17,10 @@ export function errorHandler(
   const code = isAppError ? err.code : 'INTERNAL_ERROR';
   const message = err.message || 'An unexpected internal error occurred.';
 
-  // Avoid logging benign 404 client lookups
-  if (statusCode >= 500) {
-    console.error(`[Server Error] ${req.method} ${req.originalUrl}:`, err);
-  }
+  // Standardized [API ERROR] log (excludes sensitive info / headers / tokens)
+  console.error(
+    `[API ERROR] ${statusCode} ${code} - "${message}" on ${req.method} ${req.baseUrl + req.path}`
+  );
 
   res.status(statusCode).json({
     error: {

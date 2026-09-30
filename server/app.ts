@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { corsMiddleware } from './middleware/cors';
 import { errorHandler } from './middleware/errorHandler';
+import { rateLimiter } from './middleware/rateLimiter';
 import apiRouter from './routes';
 import { AppError } from './types';
 
@@ -11,6 +12,9 @@ export function createExpressApp() {
   app.use(corsMiddleware);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+
+  // Apply rate limiting middleware to all /api endpoints
+  app.use('/api', rateLimiter.middleware());
 
   // API router mounted under /api
   app.use('/api', apiRouter);

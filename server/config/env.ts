@@ -17,4 +17,13 @@ export const config = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   },
+  cache: {
+    postsTtlSeconds: parseInt(process.env.CACHE_POSTS_TTL || '60', 10),
+    aboutTtlSeconds: parseInt(process.env.CACHE_ABOUT_TTL || '300', 10),
+    cleanupIntervalMs: 60000, // Periodic purge of expired entries
+  },
+  rateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10), // 1 minute
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX || '60', 10), // 60 requests per minute
+  },
 };
