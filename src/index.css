@@ -12,39 +12,61 @@
   }
 }
 
-/* Subtle tactical background grid for command center atmosphere */
+/* Subtle, serious developer-grade technical grid */
 .command-grid-bg {
+  background-color: #07090e;
   background-image: 
-    linear-gradient(to right, rgba(56, 189, 248, 0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(56, 189, 248, 0.025) 1px, transparent 1px);
-  background-size: 32px 32px;
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
-/* Custom technical hairline scrollbar for stream containers */
+/* Subtle hairline horizontal stream alignment rail */
+.stream-rail-wire {
+  background-image: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.15) 0%,
+    rgba(99, 102, 241, 0.15) 50%,
+    rgba(56, 189, 248, 0.15) 100%
+  );
+}
+
+/* Precision engineered scrollbars */
 .orbit-scroll::-webkit-scrollbar {
-  height: 5px;
-  width: 5px;
+  height: 4px;
+  width: 4px;
 }
 
 .orbit-scroll::-webkit-scrollbar-track {
-  background: rgba(11, 15, 23, 0.7);
+  background: rgba(9, 12, 19, 0.6);
 }
 
 .orbit-scroll::-webkit-scrollbar-thumb {
-  background: rgba(56, 189, 248, 0.22);
+  background: rgba(148, 163, 184, 0.2);
   border-radius: 2px;
 }
 
 .orbit-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.4);
 }
 
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(1000%); }
+/* Calm, natural carrier signal pulse (restrained, non-neon) */
+@keyframes carrier-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
 }
 
-.animate-scanline {
-  animation: scanline 4s linear infinite;
+.animate-carrier {
+  animation: carrier-pulse 2.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Subtle stream lane entry transition */
+.stream-lane-enter {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+}

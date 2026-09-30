@@ -1,6 +1,7 @@
 import React from 'react';
-import { RefreshCw, Plus, Radio, Layers, Activity, Cpu, ArrowUpRight } from 'lucide-react';
+import { RefreshCw, Plus, Wifi, Layers, Activity } from 'lucide-react';
 import { SubredditStream } from '../types/orbit';
+import { formatNumber } from '../utils/formatters';
 
 interface DashboardStatusProps {
   streams: SubredditStream[];
@@ -15,96 +16,105 @@ export const DashboardStatus: React.FC<DashboardStatusProps> = ({
   onOpenAddStream,
   isRefreshingAll,
 }) => {
-  const activeStreamsCount = streams.filter((s) => !s.isCollapsed).length;
+  const activeStreams = streams.filter((s) => !s.isCollapsed);
+  const activeStreamsCount = activeStreams.length;
   const totalPostsCount = streams.reduce((acc, s) => acc + s.posts.length, 0);
+  const totalReadersCount = streams.reduce((acc, s) => acc + (s.subscribers || 0), 0);
 
   return (
-    <section className="border-b border-[#161d2d] bg-[#090d16] px-3.5 sm:px-6 py-2.5">
-      <div className="max-w-[1920px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Left: Command Ribbon Telemetry Gauge */}
-        <div className="flex flex-wrap items-center gap-y-2 gap-x-4 sm:gap-x-6 text-xs">
-          {/* Signal Status */}
-          <div className="flex items-center gap-2 pr-2 border-r border-[#1a2336]">
+    <section className="border-b border-[#151c2c] bg-[#080b13] px-3.5 sm:px-6 py-2 select-none">
+      <div className="max-w-[1920px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        {/* Left: Real Technical Stream Telemetry */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+          {/* Live Carrier Bead */}
+          <div className="flex items-center gap-2 pr-3 border-r border-[#1a2336]">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400 animate-carrier" />
             </span>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-mono tracking-widest text-slate-400 font-semibold uppercase leading-none">
-                SPACE TELEMETRY
-              </span>
-              <span className="text-[11px] font-mono text-cyan-300 font-medium mt-0.5">
-                ACTIVE ORBITS
-              </span>
+            <div className="flex items-center gap-1.5 font-mono text-[11px]">
+              <span className="font-semibold text-slate-200 tracking-tight">ORBIT MONITOR</span>
+              <span className="text-slate-600">/</span>
+              <span className="text-emerald-400 font-medium">LIVE</span>
             </div>
           </div>
 
-          {/* Micro Telemetry Metrics */}
-          <div className="flex items-center gap-4 sm:gap-6 font-mono text-[11px]">
-            {/* Active Streams */}
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 uppercase text-[10px]">STREAMS:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-white font-semibold tabular-nums text-xs">
-                  {String(activeStreamsCount).padStart(2, '0')}
-                </span>
-                <div className="hidden sm:flex items-center gap-0.5">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <span
-                      key={i}
-                      className={`h-2.5 w-1 rounded-xs ${
-                        i < activeStreamsCount ? 'bg-cyan-400' : 'bg-[#182133]'
-                      }`}
-                    />
-                  ))}
-                </div>
+          {/* Metric: Active Streams with Tick Meters */}
+          <div className="flex items-center gap-2 font-mono text-[11px]">
+            <span className="text-slate-500 uppercase text-[10px]">FEEDS:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-200 font-semibold tabular-nums text-xs">
+                {String(activeStreamsCount).padStart(2, '0')}
+              </span>
+              <span className="text-slate-500 text-[10px]">/ {String(streams.length).padStart(2, '0')}</span>
+              {/* Channel ticks */}
+              <div className="hidden sm:flex items-center gap-0.5 ml-1">
+                {streams.slice(0, 8).map((s, i) => (
+                  <span
+                    key={s.id || i}
+                    title={`Feed #${i + 1}: r/${s.name} (${s.isCollapsed ? 'Collapsed' : 'Active'})`}
+                    className={`h-2.5 w-1 rounded-xs transition-colors ${
+                      s.isCollapsed
+                        ? 'bg-[#1b253b]'
+                        : s.isLoading
+                        ? 'bg-cyan-400/50 animate-pulse'
+                        : 'bg-cyan-400'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
-
-            <span className="text-slate-800" aria-hidden="true">|</span>
-
-            {/* Posts Buffered */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-400 uppercase text-[10px]">BUFFER:</span>
-              <span className="text-white font-semibold tabular-nums text-xs">
-                {String(totalPostsCount).padStart(3, '0')}
-              </span>
-              <span className="text-slate-400 text-[10px] hidden sm:inline">PACKETS</span>
-            </div>
-
-            <span className="text-slate-800 hidden sm:inline" aria-hidden="true">|</span>
-
-            {/* Stream Protocol Latency */}
-            <div className="hidden lg:flex items-center gap-1.5 text-slate-400 text-[11px]">
-              <span className="uppercase text-[10px]">LATENCY:</span>
-              <span className="text-emerald-400 font-semibold tabular-nums">14ms</span>
-              <span className="text-slate-500 font-mono text-[10px]">P99</span>
-            </div>
           </div>
+
+          <span className="text-slate-700 hidden sm:inline" aria-hidden="true">·</span>
+
+          {/* Metric: Total Posts Loaded */}
+          <div className="flex items-center gap-1.5 font-mono text-[11px]">
+            <span className="text-slate-500 uppercase text-[10px]">BUFFERED:</span>
+            <span className="text-slate-200 font-semibold tabular-nums">
+              {formatNumber(totalPostsCount)}
+            </span>
+            <span className="text-slate-500 text-[10px]">posts</span>
+          </div>
+
+          {totalReadersCount > 0 && (
+            <>
+              <span className="text-slate-700 hidden md:inline" aria-hidden="true">·</span>
+              {/* Metric: Connected Readers */}
+              <div className="hidden md:flex items-center gap-1.5 font-mono text-[11px]">
+                <span className="text-slate-500 uppercase text-[10px]">AUDIENCE:</span>
+                <span className="text-slate-200 font-semibold tabular-nums">
+                  {formatNumber(totalReadersCount)}
+                </span>
+                <span className="text-slate-500 text-[10px]">readers</span>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Right: Technical Command Actions */}
-        <div className="flex items-center gap-2 self-start md:self-auto font-mono text-xs">
+        {/* Right: Technical Command Controls */}
+        <div className="flex items-center gap-2 self-start sm:self-auto font-mono text-xs">
+          {/* Sync All Button */}
           <button
             type="button"
             onClick={onRefreshAll}
             disabled={isRefreshingAll}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-slate-300 hover:text-white bg-[#0e1422] hover:bg-[#151c2e] border border-[#1e273a] hover:border-cyan-500/40 rounded transition-colors disabled:opacity-50 cursor-pointer"
-            title="Synchronize all streams"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-slate-300 hover:text-white bg-[#0e1422] hover:bg-[#141d30] border border-[#1d273c] hover:border-cyan-500/40 rounded transition-colors disabled:opacity-50 cursor-pointer text-[11px]"
+            title="Fetch live updates across all active subreddit streams"
           >
             <RefreshCw
               className={`w-3 h-3 text-cyan-400 ${isRefreshingAll ? 'animate-spin' : ''}`}
             />
-            <span>{isRefreshingAll ? 'SYNCING...' : 'SYNC ALL'}</span>
+            <span>{isRefreshingAll ? 'SYNCING...' : 'SYNC FEEDS'}</span>
           </button>
 
+          {/* Add Stream Button */}
           <button
             type="button"
             onClick={onOpenAddStream}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-cyan-300 hover:text-cyan-100 bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-700/50 hover:border-cyan-500/80 rounded transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-cyan-300 hover:text-cyan-100 bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-700/50 hover:border-cyan-500/80 rounded transition-colors cursor-pointer text-[11px] font-semibold"
           >
             <Plus className="w-3 h-3" />
-            <span>ADD STREAM</span>
+            <span>+ FEED</span>
           </button>
         </div>
       </div>

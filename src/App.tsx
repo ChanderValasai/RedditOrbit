@@ -664,6 +664,34 @@ export default function App() {
         ref={streamsContainerRef}
         className="flex-1 w-full overflow-x-auto overflow-y-hidden p-3.5 sm:p-5 orbit-scroll"
       >
+        {/* Technical Information Stream Rail */}
+        {streams.length > 0 && (
+          <div className="hidden lg:flex items-center justify-between mb-3 px-1 text-[11px] font-mono text-slate-500 select-none border-b border-[#141c2c] pb-2">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-carrier" />
+              <span className="text-slate-200 font-semibold tracking-wide text-xs">
+                INFORMATION RAIL
+              </span>
+              <span className="text-slate-700">·</span>
+              <span className="text-slate-400">
+                {streams.length} {streams.length === 1 ? 'feed connected' : 'feeds connected'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 text-[10.5px]">
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <span className="text-slate-500">Reorder:</span>
+                <span className="text-slate-300">Grip handle / Tab+Space</span>
+              </span>
+              <span className="text-slate-700">·</span>
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <span className="text-slate-500">Mode:</span>
+                <span className="capitalize text-cyan-300 font-medium">{density}</span>
+              </span>
+            </div>
+          </div>
+        )}
+
         {streams.length === 0 ? (
           <div className="h-[calc(100vh-200px)] flex flex-col items-center justify-center text-center p-8 border border-dashed border-[#1c263c] rounded-lg bg-[#080c16]/50 max-w-xl mx-auto">
             <div className="w-14 h-14 rounded-full bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4 animate-pulse">

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { SubredditStream, RedditPost, SortOption, TimeRange, StreamDensity } from '../types/orbit';
 import { PostCard } from './PostCard';
-import { formatNumber } from '../utils/formatters';
+import { formatNumber, formatTimeAgo } from '../utils/formatters';
 
 interface StreamLaneProps {
   stream: SubredditStream;
@@ -78,25 +78,29 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
   }, []);
 
   const sortTabs: { id: SortOption; label: string; icon: React.ReactNode }[] = [
-    { id: 'hot', label: 'HOT', icon: <Flame className="w-3 h-3" /> },
-    { id: 'new', label: 'NEW', icon: <Clock className="w-3 h-3" /> },
-    { id: 'top', label: 'TOP', icon: <Award className="w-3 h-3" /> },
-    { id: 'rising', label: 'RISING', icon: <TrendingUp className="w-3 h-3" /> },
+    { id: 'hot', label: 'Hot', icon: <Flame className="w-3 h-3" /> },
+    { id: 'new', label: 'New', icon: <Clock className="w-3 h-3" /> },
+    { id: 'top', label: 'Top', icon: <Award className="w-3 h-3" /> },
+    { id: 'rising', label: 'Rising', icon: <TrendingUp className="w-3 h-3" /> },
   ];
 
-  // Subtle top accent tint to differentiate streams
+  // Subtle top accent tint to differentiate streams (calm hairline)
   const streamAccents = [
-    'border-t-cyan-400',
-    'border-t-sky-400',
-    'border-t-teal-400',
-    'border-t-indigo-400',
-    'border-t-emerald-400',
+    'border-t-cyan-500/70',
+    'border-t-sky-500/70',
+    'border-t-indigo-500/70',
+    'border-t-teal-500/70',
+    'border-t-slate-400/70',
   ];
   const accentClass = streamAccents[streamIndex % streamAccents.length];
 
   if (stream.isCollapsed) {
     return (
-      <div className={`shrink-0 w-16 md:w-18 bg-[#0b0e16] border border-[#1b2234] border-t-2 ${accentClass} ${isDragOverlay ? 'ring-2 ring-cyan-400 border-cyan-400 shadow-2xl shadow-cyan-500/40' : ''} rounded-sm flex flex-col items-center py-4 justify-between select-none h-full max-h-[calc(100vh-125px)]`}>
+      <div
+        className={`shrink-0 w-16 md:w-18 bg-[#0a0d16] border border-[#182133] border-t-2 ${accentClass} ${
+          isDragOverlay ? 'ring-1 ring-cyan-400 border-cyan-400 shadow-xl' : ''
+        } rounded-xs flex flex-col items-center py-3.5 justify-between select-none h-full max-h-[calc(100vh-125px)] transition-all`}
+      >
         <div className="flex flex-col items-center gap-2">
           {dragHandleProps && (
             <button
@@ -112,48 +116,73 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="p-1.5 text-cyan-400 hover:text-cyan-300 hover:bg-[#141b2b] rounded transition-colors cursor-pointer"
-            title="Expand stream"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-[#141b2b] rounded transition-colors cursor-pointer"
+            title="Expand stream lane"
           >
             <ChevronDown className="w-4 h-4 rotate-270" />
           </button>
-          <span className="text-[10px] font-mono text-cyan-400 font-bold">
-            #{String(streamIndex + 1).padStart(2, '0')}
+          <span className="text-[10px] font-mono text-cyan-400 font-semibold">
+            {String(streamIndex + 1).padStart(2, '0')}
           </span>
         </div>
 
-        <div className="transform -rotate-90 origin-center whitespace-nowrap text-xs font-mono font-bold text-slate-300 tracking-wider">
+        <div className="transform -rotate-90 origin-center whitespace-nowrap text-xs font-mono font-medium text-slate-300 tracking-wide">
           {stream.displayName}
         </div>
 
-        <div className="text-[10px] font-mono text-slate-500 tabular-nums">
-          {stream.posts.length}P
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="text-[10px] font-mono text-slate-400 tabular-nums">
+            {stream.posts.length}P
+          </span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              stream.error ? 'bg-rose-400' : 'bg-emerald-400'
+            }`}
+          />
         </div>
       </div>
     );
   }
 
   return (
-    <section className={`shrink-0 w-full sm:w-[380px] lg:w-[415px] xl:w-[435px] flex flex-col bg-[#0b0e16] border border-[#1a2133] border-t-2 ${accentClass} ${isDragOverlay ? 'ring-2 ring-cyan-400 border-cyan-400 shadow-2xl shadow-cyan-500/40 opacity-95' : ''} rounded-sm overflow-hidden h-[calc(100vh-120px)] shadow-xl transition-all`}>
-      {/* Stream Top Header with Telemetry Bar */}
-      <header className="px-3.5 py-2.5 border-b border-[#182032] bg-[#0e121e] select-none">
+    <section
+      className={`shrink-0 w-full sm:w-[380px] lg:w-[410px] xl:w-[430px] flex flex-col bg-[#090c15] border border-[#161f30] border-t-2 ${accentClass} ${
+        isDragOverlay ? 'ring-1 ring-cyan-400/80 border-cyan-400 shadow-2xl opacity-95' : ''
+      } rounded-xs overflow-hidden h-[calc(100vh-120px)] shadow-lg transition-all`}
+    >
+      {/* Stream Top Header */}
+      <header className="px-3.5 py-2.5 border-b border-[#151d2d] bg-[#0c101a] select-none">
         <div className="flex items-start justify-between gap-2">
-          {/* Identity & Status */}
+          {/* Identity & Technical Metadata */}
           <div className="min-w-0 flex-1">
-            {/* Telemetry Index Bar */}
-            <div className="flex items-center gap-2 mb-1 text-[10px] font-mono text-slate-400">
-              <span className="text-cyan-400 font-bold tracking-tight">
-                STREAM // {String(streamIndex + 1).padStart(2, '0')}
+            {/* Telemetry Index & Status line */}
+            <div className="flex items-center gap-2 mb-1 text-[10.5px] font-mono text-slate-400">
+              <span className="text-slate-300 font-semibold tracking-tight">
+                FEED {String(streamIndex + 1).padStart(2, '0')}
               </span>
-              <span className="text-slate-700" aria-hidden="true">|</span>
+              <span className="text-slate-700" aria-hidden="true">·</span>
               <span className="flex items-center gap-1 text-slate-400 tabular-nums">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block animate-pulse" />
-                <span>{formatNumber(stream.subscribers)} READERS</span>
+                <span
+                  className={`w-1.5 h-1.5 rounded-full inline-block ${
+                    stream.error
+                      ? 'bg-rose-400'
+                      : stream.isLoading
+                      ? 'bg-cyan-400 animate-pulse'
+                      : 'bg-emerald-400'
+                  }`}
+                />
+                <span className="text-[10px]">
+                  {stream.error ? 'DISCONNECTED' : stream.isLoading ? 'SYNCING' : 'LIVE'}
+                </span>
+              </span>
+              <span className="text-slate-700" aria-hidden="true">·</span>
+              <span className="text-slate-400 tabular-nums text-[10.5px]">
+                {formatNumber(stream.subscribers)} readers
               </span>
             </div>
 
-            <h2 className="text-[15px] font-bold text-white tracking-tight flex items-center gap-1.5 truncate">
-              <span className="font-mono text-cyan-400 text-sm">r/</span>
+            <h2 className="text-[15px] font-bold text-slate-100 tracking-tight flex items-center gap-1 truncate">
+              <span className="font-mono text-cyan-400/90 text-sm">r/</span>
               <span className="truncate">{stream.name}</span>
             </h2>
             <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5 leading-snug">
@@ -162,13 +191,13 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
           </div>
 
           {/* Stream Actions */}
-          <div className="flex items-center gap-1 shrink-0 pt-0.5">
+          <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
             {/* Drag Handle */}
             {dragHandleProps && (
               <button
                 type="button"
                 {...dragHandleProps}
-                className="p-1.5 text-slate-500 hover:text-cyan-400 hover:bg-[#161c2e] rounded transition-colors cursor-grab active:cursor-grabbing focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-400 touch-none select-none"
+                className="p-1.5 text-slate-500 hover:text-cyan-400 hover:bg-[#131b2c] rounded transition-colors cursor-grab active:cursor-grabbing focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-400 touch-none select-none"
                 title="Drag to reorder stream lane (or use keyboard: Tab, Space, Arrow keys)"
                 aria-label={`Drag stream r/${stream.name} to reorder`}
               >
@@ -181,7 +210,7 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
               type="button"
               onClick={onRefresh}
               disabled={stream.isLoading}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-[#161c2e] rounded transition-colors disabled:opacity-50 cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-[#131b2c] rounded transition-colors disabled:opacity-50 cursor-pointer"
               title="Refresh stream"
             >
               <RotateCcw
@@ -193,8 +222,8 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-[#161c2e] rounded transition-colors cursor-pointer"
-              title="Collapse lane"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-[#131b2c] rounded transition-colors cursor-pointer"
+              title="Collapse lane into compact pillar"
             >
               <ChevronUp className="w-3.5 h-3.5" />
             </button>
@@ -204,7 +233,7 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
               <button
                 type="button"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-[#161c2e] rounded transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-[#131b2c] rounded transition-colors cursor-pointer"
                 title="Stream options"
                 aria-expanded={isMenuOpen}
               >
@@ -212,15 +241,15 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
               </button>
 
               {isMenuOpen && (
-                <div className="absolute right-0 mt-1.5 w-52 bg-[#101422] border border-[#232c42] rounded shadow-2xl py-1 z-50">
-                  <div className="px-3 py-1 text-[10px] uppercase font-mono tracking-widest text-slate-400 border-b border-[#182032]">
-                    STREAM CONTROLS
+                <div className="absolute right-0 mt-1.5 w-52 bg-[#0e1320] border border-[#212b40] rounded shadow-2xl py-1 z-50 divide-y divide-[#172033]">
+                  <div className="px-3 py-1 text-[10px] uppercase font-mono tracking-widest text-slate-400">
+                    STREAM OPTIONS
                   </div>
 
                   {/* Reordering */}
-                  <div className="px-1 py-1 border-b border-[#182032]">
-                    <div className="px-2 py-1 text-[10px] text-slate-400 font-mono">POSITION</div>
-                    <div className="flex gap-1 px-2 pb-1">
+                  <div className="px-2 py-1.5">
+                    <div className="text-[10px] text-slate-400 font-mono mb-1">POSITION</div>
+                    <div className="flex gap-1">
                       <button
                         type="button"
                         onClick={() => {
@@ -228,7 +257,7 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
                           setIsMenuOpen(false);
                         }}
                         disabled={!canMoveLeft}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-[#161d2f] hover:bg-[#1d263d] disabled:opacity-30 disabled:pointer-events-none text-slate-300 rounded font-mono"
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-[#141b2a] hover:bg-[#1a2336] disabled:opacity-30 disabled:pointer-events-none text-slate-300 rounded font-mono"
                       >
                         <ArrowLeft className="w-3 h-3" />
                         <span>Left</span>
@@ -240,7 +269,7 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
                           setIsMenuOpen(false);
                         }}
                         disabled={!canMoveRight}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-[#161d2f] hover:bg-[#1d263d] disabled:opacity-30 disabled:pointer-events-none text-slate-300 rounded font-mono"
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs bg-[#141b2a] hover:bg-[#1a2336] disabled:opacity-30 disabled:pointer-events-none text-slate-300 rounded font-mono"
                       >
                         <span>Right</span>
                         <ArrowRight className="w-3 h-3" />
@@ -249,22 +278,24 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
                   </div>
 
                   {/* Duplicate */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onDuplicate();
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-[#161d2f] flex items-center gap-2"
-                  >
-                    <Copy className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Duplicate Stream</span>
-                  </button>
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDuplicate();
+                        setIsMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-[#141b2a] flex items-center gap-2 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Duplicate Stream</span>
+                    </button>
+                  </div>
 
-                  {/* State Simulation Demo */}
+                  {/* Simulation demo */}
                   {onSimulateState && (
-                    <div className="px-1 py-1 border-t border-[#182032]">
-                      <div className="px-2 py-1 text-[10px] text-slate-400 font-mono">SIMULATE STATE</div>
+                    <div className="px-2 py-1.5">
+                      <div className="text-[10px] text-slate-400 font-mono mb-1">PREVIEW STATE</div>
                       <div className="flex flex-col gap-0.5">
                         <button
                           type="button"
@@ -272,9 +303,9 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
                             onSimulateState('normal');
                             setIsMenuOpen(false);
                           }}
-                          className="w-full text-left px-2 py-1 text-[11px] text-slate-300 hover:bg-[#161d2f] rounded font-mono"
+                          className="w-full text-left px-2 py-1 text-[11px] text-slate-300 hover:bg-[#141b2a] rounded font-mono"
                         >
-                          ● Live Data
+                          ● Normal Feed
                         </button>
                         <button
                           type="button"
@@ -282,9 +313,9 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
                             onSimulateState('empty');
                             setIsMenuOpen(false);
                           }}
-                          className="w-full text-left px-2 py-1 text-[11px] text-amber-300 hover:bg-[#161d2f] rounded font-mono"
+                          className="w-full text-left px-2 py-1 text-[11px] text-amber-300 hover:bg-[#141b2a] rounded font-mono"
                         >
-                          ○ Empty (No Signal)
+                          ○ Empty Feed
                         </button>
                         <button
                           type="button"
@@ -292,23 +323,23 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
                             onSimulateState('error');
                             setIsMenuOpen(false);
                           }}
-                          className="w-full text-left px-2 py-1 text-[11px] text-rose-300 hover:bg-[#161d2f] rounded font-mono"
+                          className="w-full text-left px-2 py-1 text-[11px] text-rose-300 hover:bg-[#141b2a] rounded font-mono"
                         >
-                          ✕ Signal Lost (Error)
+                          ✕ Carrier Timeout
                         </button>
                       </div>
                     </div>
                   )}
 
                   {/* Remove stream */}
-                  <div className="pt-1 border-t border-[#182032]">
+                  <div className="p-1">
                     <button
                       type="button"
                       onClick={() => {
                         onRemove();
                         setIsMenuOpen(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-950/40 flex items-center gap-2 font-mono"
+                      className="w-full text-left px-2.5 py-1 text-xs text-rose-400 hover:bg-rose-950/40 rounded flex items-center gap-2 font-mono cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Remove Stream</span>
@@ -320,9 +351,9 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
           </div>
         </div>
 
-        {/* Sorting Tabs - High Contrast Segmented Control */}
-        <div className="mt-2 pt-2 border-t border-[#172033] flex items-center justify-between">
-          <div className="flex items-center gap-0.5 bg-[#090c14] p-0.5 rounded border border-[#182135]">
+        {/* Sorting Tabs - Clean Segmented Control */}
+        <div className="mt-2 pt-2 border-t border-[#141b29] flex items-center justify-between">
+          <div className="flex items-center gap-0.5 bg-[#080b13] p-0.5 rounded border border-[#161f30]">
             {sortTabs.map((tab) => {
               const isActive = stream.sort === tab.id;
               return (
@@ -330,9 +361,9 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
                   key={tab.id}
                   type="button"
                   onClick={() => onChangeSort(tab.id)}
-                  className={`flex items-center gap-1 px-2 py-0.5 text-[10.5px] font-mono uppercase tracking-wide rounded-xs transition-colors cursor-pointer ${
+                  className={`flex items-center gap-1 px-2 py-0.5 text-[10.5px] font-mono tracking-tight rounded-xs transition-colors cursor-pointer ${
                     isActive
-                      ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
+                      ? 'bg-[#151e30] text-cyan-300 font-semibold shadow-xs'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -344,14 +375,14 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
           </div>
 
           <span className="text-[10px] font-mono text-slate-400 tabular-nums">
-            {stream.posts.length} TRANSMISSIONS
+            {stream.posts.length} {stream.posts.length === 1 ? 'post' : 'posts'}
           </span>
         </div>
 
-        {/* Top Time Range Selector (shown when Top is active) */}
+        {/* Top Time Range Selector */}
         {stream.sort === 'top' && (
-          <div className="mt-1.5 pt-1.5 border-t border-[#141b2c] flex items-center justify-between text-[10px] font-mono">
-            <span className="text-cyan-400 font-bold">RANGE:</span>
+          <div className="mt-1.5 pt-1.5 border-t border-[#141b29] flex items-center justify-between text-[10px] font-mono">
+            <span className="text-slate-500 uppercase">TIME RANGE:</span>
             <div className="flex items-center gap-1">
               {(
                 [
@@ -370,7 +401,7 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
                     onClick={() => onChangeTimeRange && onChangeTimeRange(t.id)}
                     className={`px-1.5 py-0.5 rounded-xs transition-colors uppercase ${
                       isSelected
-                        ? 'bg-cyan-500/20 text-cyan-300 font-bold'
+                        ? 'bg-cyan-500/20 text-cyan-300 font-semibold'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
@@ -383,92 +414,88 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
         )}
       </header>
 
-      {/* Stream Content Area */}
-      <div className="flex-1 overflow-y-auto orbit-scroll bg-[#080a10]">
-        {/* Radar Scanner Loading Skeleton */}
-        {stream.isLoading && (
-          <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between text-xs text-cyan-400 font-mono pb-2 border-b border-[#141b2a]">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                <span>RECEIVING PACKETS...</span>
+      {/* Loading Hairline Indicator */}
+      {stream.isLoading && (
+        <div className="h-0.5 w-full bg-[#121927] overflow-hidden">
+          <div className="h-full bg-cyan-400/80 w-1/3 animate-[scanline_2s_ease-in-out_infinite]" />
+        </div>
+      )}
+
+      {/* Stream Content Body */}
+      <div className="flex-1 overflow-y-auto orbit-scroll bg-[#070911]">
+        {/* Loading Skeletons */}
+        {stream.isLoading && stream.posts.length === 0 && (
+          <div className="p-3.5 space-y-3">
+            <div className="flex items-center justify-between text-xs text-slate-400 font-mono pb-2 border-b border-[#141b29]">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span>Connecting to r/{stream.name}...</span>
               </div>
-              <span className="text-slate-500 text-[10px]">SCAN // 42%</span>
+              <span className="text-slate-500 text-[10px]">Buffered 0</span>
             </div>
             {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="p-3 border-b border-[#141b29] space-y-2.5 animate-pulse"
-              >
+              <div key={i} className="p-3 border-b border-[#121826] space-y-2 animate-pulse">
                 <div className="flex items-center gap-2">
-                  <div className="h-2 bg-[#172034] rounded w-16" />
-                  <div className="h-2 bg-[#141b2b] rounded w-20" />
+                  <div className="h-2 bg-[#141b2b] rounded w-16" />
+                  <div className="h-2 bg-[#111724] rounded w-20" />
                 </div>
-                <div className="h-3.5 bg-[#172034] rounded w-11/12" />
-                <div className="h-3.5 bg-[#172034] rounded w-3/4" />
+                <div className="h-3.5 bg-[#141b2b] rounded w-11/12" />
+                <div className="h-3.5 bg-[#141b2b] rounded w-3/4" />
                 <div className="flex items-center gap-3 pt-1">
-                  <div className="h-2.5 bg-[#141b2b] rounded w-12" />
-                  <div className="h-2.5 bg-[#141b2b] rounded w-16" />
+                  <div className="h-2.5 bg-[#111724] rounded w-12" />
+                  <div className="h-2.5 bg-[#111724] rounded w-16" />
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Technical Error State: SIGNAL LOST */}
-        {!stream.isLoading && stream.error && (
-          <div className="p-6 text-center flex flex-col items-center justify-center h-full min-h-[320px]">
-            <div className="w-12 h-12 rounded-sm bg-rose-950/40 border border-rose-800/60 flex items-center justify-center text-rose-400 mb-3.5">
-              <WifiOff className="w-6 h-6" />
+        {/* Error State */}
+        {stream.error && (
+          <div className="p-6 text-center flex flex-col items-center justify-center h-full min-h-[300px]">
+            <div className="w-10 h-10 rounded bg-rose-950/40 border border-rose-800/40 flex items-center justify-center text-rose-400 mb-3">
+              <WifiOff className="w-5 h-5" />
             </div>
-            <div className="text-[11px] font-mono text-rose-400 uppercase tracking-widest font-semibold">
-              TRANSMISSION TIMEOUT
-            </div>
-            <h3 className="text-base font-bold text-white tracking-tight mt-1 font-mono">
-              SIGNAL LOST // 504
+            <h3 className="text-sm font-semibold text-slate-200 tracking-tight font-sans">
+              Unable to Load Stream
             </h3>
-            <p className="text-xs text-slate-400 mt-2 max-w-[280px] leading-relaxed">
-              Carrier drop detected on <span className="text-rose-300 font-mono font-medium">{stream.displayName}</span>. Subreddit API unresponsive.
-            </p>
-            <div className="mt-5 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onRefresh}
-                className="px-3.5 py-1.5 text-xs font-mono font-semibold text-white bg-rose-950/60 hover:bg-rose-900/70 border border-rose-700/60 rounded transition-colors cursor-pointer"
-              >
-                RE-ESTABLISH SIGNAL
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Technical Empty State: NO SIGNAL */}
-        {!stream.isLoading && !stream.error && stream.posts.length === 0 && (
-          <div className="p-6 text-center flex flex-col items-center justify-center h-full min-h-[320px]">
-            <div className="w-12 h-12 rounded-sm bg-[#101524] border border-[#1d273f] flex items-center justify-center text-slate-400 mb-3.5">
-              <Radio className="w-6 h-6 text-slate-500 animate-pulse" />
-            </div>
-            <div className="text-[11px] font-mono text-cyan-400 uppercase tracking-widest font-semibold">
-              FREQUENCY IDLE
-            </div>
-            <h3 className="text-base font-bold text-white tracking-tight mt-1 font-mono">
-              NO TRANSMISSIONS
-            </h3>
-            <p className="text-xs text-slate-400 mt-2 max-w-[280px] leading-relaxed">
-              No matching posts found in this orbit channel for sort filter <span className="text-cyan-300 font-mono uppercase">[{stream.sort}]</span>.
+            <p className="text-xs text-slate-400 mt-1.5 max-w-[260px] leading-relaxed">
+              Connection to <span className="font-mono text-slate-300">r/{stream.name}</span> timed out. Reddit servers may be under heavy load.
             </p>
             <button
               type="button"
               onClick={onRefresh}
-              className="mt-5 px-3.5 py-1.5 text-xs font-mono font-semibold text-cyan-300 bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/60 rounded transition-colors cursor-pointer"
+              className="mt-4 px-3 py-1.5 text-xs font-mono font-medium text-white bg-rose-950/60 hover:bg-rose-900/70 border border-rose-700/50 rounded transition-colors cursor-pointer"
             >
-              SCAN FEED AGAIN
+              Retry Connection
             </button>
           </div>
         )}
 
-        {/* Normal Populated Post Stream */}
-        {!stream.isLoading && !stream.error && stream.posts.length > 0 && (
+        {/* Empty State */}
+        {!stream.isLoading && !stream.error && stream.posts.length === 0 && (
+          <div className="p-6 text-center flex flex-col items-center justify-center h-full min-h-[300px]">
+            <div className="w-10 h-10 rounded bg-[#0d121e] border border-[#1a2337] flex items-center justify-center text-slate-400 mb-3">
+              <Radio className="w-5 h-5 text-slate-500" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-200 tracking-tight font-sans">
+              No Posts Found
+            </h3>
+            <p className="text-xs text-slate-400 mt-1.5 max-w-[260px] leading-relaxed">
+              No entries currently match the <span className="font-mono uppercase text-cyan-300">[{stream.sort}]</span> filter in r/{stream.name}.
+            </p>
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="mt-4 px-3 py-1.5 text-xs font-mono font-medium text-cyan-300 bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-800/50 rounded transition-colors cursor-pointer"
+            >
+              Refresh Stream
+            </button>
+          </div>
+        )}
+
+        {/* Populated Post Stream */}
+        {!stream.error && stream.posts.length > 0 && (
           <div>
             {stream.posts.map((post) => (
               <PostCard
@@ -482,18 +509,18 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
         )}
       </div>
 
-      {/* Stream Footer with Telemetry Health */}
-      <footer className="px-3.5 py-2 border-t border-[#161e30] bg-[#0a0d16] flex items-center justify-between text-[10.5px] text-slate-400 font-mono">
+      {/* Stream Footer */}
+      <footer className="px-3.5 py-1.5 border-t border-[#131a29] bg-[#090c14] flex items-center justify-between text-[10px] text-slate-400 font-mono">
         <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          <span>SYNCED LIVE</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/90" />
+          <span>Synced live</span>
         </span>
         <button
           type="button"
           onClick={onRefresh}
-          className="text-cyan-400 hover:text-cyan-300 hover:underline transition-colors cursor-pointer"
+          className="text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
         >
-          RE-SYNC
+          Refresh
         </button>
       </footer>
     </section>
