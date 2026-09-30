@@ -4,18 +4,13 @@ import {
   PaginationInfo,
   PostQueryParams,
   RedditApiError,
+  RedditErrorCode,
 } from '../types/reddit';
-import {
-  parseRedditPostsResponse,
-  parseSubredditAboutResponse,
-  createParseError,
-} from './redditParser';
 
 /**
- * Service interface for fetching Reddit data.
+ * Service interface for fetching Reddit data via our Express API.
  * The application depends ONLY on this interface.
- * When migrating from Client->Reddit to Client->Express API->Reddit,
- * only this service implementation changes; UI components remain untouched.
+ * UI components are completely isolated from backend and Reddit implementation details.
  */
 export interface IRedditService {
   getSubredditPosts(
@@ -30,76 +25,77 @@ export interface IRedditService {
   getSubredditAbout(subreddit: string): Promise<NormalizedSubreddit>;
 }
 
-class RedditApiService implements IRedditService {
-  private baseUrl = 'https://www.reddit.com';
+function mapErrorCode(code: string): RedditErrorCode {
+  switch (code) {
+    case 'NOT_FOUND':
+      return 'NOT_FOUND';
+    case 'PRIVATE_COMMUNITY':
+      return 'PRIVATE_COMMUNITY';
+    case 'RATE_LIMITED':
+      return 'RATE_LIMITED';
+    case 'BAD_REQUEST':
+      return 'INVALID_DATA';
+    case 'UPSTREAM_ERROR':
+    case 'INTERNAL_ERROR':
+    default:
+      return 'SERVER_ERROR';
+  }
+}
+
+class OrbitBackendApiService implements IRedditService {
+  private apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') + '/api';
 
   /**
-   * Helper that attempts direct fetch, and falls back to a public CORS gateway if
-   * the client browser encounters cross-origin restrictions from Reddit's servers.
+   * Safe fetch utility that parses Express API responses and unifies error reporting
    */
-  private async fetchWithFallback(targetUrl: string): Promise<any> {
-    const headers = {
-      Accept: 'application/json',
-    };
+  private async fetchApi<T>(path: string): Promise<T> {
+    const url = `${this.apiBase}${path}`;
 
-    // 1. Primary Attempt: Direct public Reddit JSON endpoint
     try {
-      const response = await fetch(targetUrl, { headers });
+      const response = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+        },
+      });
 
-      if (response.status === 404) {
-        throw createParseError('NOT_FOUND', 'Subreddit not found on Reddit network.', 404);
-      }
-      if (response.status === 403) {
-        throw createParseError(
-          'PRIVATE_COMMUNITY',
-          'Subreddit is private, quarantined, or inaccessible.',
-          403
-        );
-      }
-      if (response.status === 429) {
-        throw createParseError(
-          'RATE_LIMITED',
-          'Reddit API rate limit hit. Please wait a few seconds.',
-          429
-        );
-      }
-      if (!response.ok) {
-        throw createParseError(
-          'SERVER_ERROR',
-          `Reddit server responded with status ${response.status}`,
-          response.status
-        );
+      let payload: any;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
       }
 
-      const json = await response.json();
-      return json;
+      if (!response.ok || !payload?.success) {
+        const errorInfo = payload?.error || {};
+        const code: RedditErrorCode = mapErrorCode(errorInfo.code || '');
+        const message: string =
+          errorInfo.message || `Request failed with status ${response.status}`;
+
+        const apiError: RedditApiError = {
+          code,
+          message,
+          status: response.status,
+          technicalDetails: errorInfo.details ? JSON.stringify(errorInfo.details) : undefined,
+        };
+        throw apiError;
+      }
+
+      return payload.data as T;
     } catch (err: any) {
-      // If it's already a recognized RedditApiError with a specific status, rethrow
-      if (err && err.code && err.code !== 'NETWORK_ERROR') {
+      if (err.code && err.message) {
         throw err;
       }
-
-      // 2. Secondary Attempt: Fallback CORS Gateway if browser blocked direct cross-origin JSON
-      try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-        const proxyResponse = await fetch(proxyUrl);
-        if (proxyResponse.ok) {
-          const proxyJson = await proxyResponse.json();
-          return proxyJson;
-        }
-      } catch {
-        // Fallback failed as well, throw original or structured error
-      }
-
-      throw createParseError(
-        'NETWORK_ERROR',
-        err.message || 'Unable to establish carrier connection with Reddit.'
-      );
+      const networkError: RedditApiError = {
+        code: 'NETWORK_ERROR',
+        message: err.message || 'Unable to establish connection to Reddit Orbit backend service.',
+      };
+      throw networkError;
     }
   }
 
   /**
-   * Fetches posts for a subreddit with sorting, time range, and pagination.
+   * Fetches posts for a subreddit through our Express API
+   * GET /api/subreddits/:name/posts
    */
   async getSubredditPosts(
     subreddit: string,
@@ -107,28 +103,37 @@ class RedditApiService implements IRedditService {
   ): Promise<{ posts: NormalizedPost[]; pagination: PaginationInfo }> {
     const cleanSub = subreddit.trim().replace(/^r\//i, '').toLowerCase();
     if (!cleanSub) {
-      throw createParseError('NOT_FOUND', 'Invalid subreddit identifier provided.');
+      const err: RedditApiError = {
+        code: 'INVALID_DATA',
+        message: 'Invalid or empty subreddit identifier provided.',
+      };
+      throw err;
     }
 
-    const sort = params.sort || 'hot';
-    const limit = params.limit || 25;
+    const query = new URLSearchParams();
+    if (params.sort) query.set('sort', params.sort);
+    if (params.timeRange && params.sort === 'top') query.set('timeRange', params.timeRange);
+    if (params.limit) query.set('limit', String(params.limit));
+    if (params.after) query.set('after', params.after);
 
-    let url = `${this.baseUrl}/r/${cleanSub}/${sort}.json?limit=${limit}`;
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    const data = await this.fetchApi<{
+      subreddit: string;
+      sort: string;
+      timeRange?: string;
+      posts: NormalizedPost[];
+      pagination: PaginationInfo;
+    }>(`/subreddits/${encodeURIComponent(cleanSub)}/posts${queryString}`);
 
-    if (sort === 'top' && params.timeRange) {
-      url += `&t=${params.timeRange}`;
-    }
-
-    if (params.after) {
-      url += `&after=${encodeURIComponent(params.after)}`;
-    }
-
-    const rawData = await this.fetchWithFallback(url);
-    return parseRedditPostsResponse(rawData);
+    return {
+      posts: data.posts,
+      pagination: data.pagination,
+    };
   }
 
   /**
-   * Validates subreddit existence and retrieves community metadata.
+   * Validates subreddit existence and returns community info
+   * GET /api/subreddits/:name
    */
   async validateSubreddit(
     subreddit: string
@@ -139,55 +144,27 @@ class RedditApiService implements IRedditService {
     }
 
     try {
-      // First attempt to read about.json for full metadata
-      const aboutUrl = `${this.baseUrl}/r/${cleanSub}/about.json`;
-      const rawAbout = await this.fetchWithFallback(aboutUrl);
-      const info = parseSubredditAboutResponse(rawAbout);
+      const info = await this.getSubredditAbout(cleanSub);
       return { exists: true, info };
     } catch (err: any) {
-      // If about.json is protected, check if posts feed returns listings
-      try {
-        const postsUrl = `${this.baseUrl}/r/${cleanSub}/hot.json?limit=1`;
-        const rawPosts = await this.fetchWithFallback(postsUrl);
-        const { posts } = parseRedditPostsResponse(rawPosts);
-
-        return {
-          exists: true,
-          info: {
-            name: cleanSub,
-            displayName: `r/${cleanSub}`,
-            title: `r/${cleanSub}`,
-            tagline: `Community feed for r/${cleanSub}`,
-            description: '',
-            subscribers: 0,
-            activeUsers: 0,
-            isNsfw: false,
-            createdUtc: Math.floor(Date.now() / 1000),
-          },
-        };
-      } catch (fallbackErr: any) {
-        const message =
-          fallbackErr.code === 'NOT_FOUND'
-            ? 'Subreddit not found on Reddit.'
-            : fallbackErr.code === 'PRIVATE_COMMUNITY'
-            ? 'This community is private or restricted.'
-            : fallbackErr.message || 'Validation request failed.';
-
-        return { exists: false, error: message };
-      }
+      const errorMsg =
+        err.code === 'NOT_FOUND'
+          ? `Community r/${cleanSub} does not exist.`
+          : err.code === 'PRIVATE_COMMUNITY'
+          ? `r/${cleanSub} is private or restricted.`
+          : err.message || 'Validation request failed.';
+      return { exists: false, error: errorMsg };
     }
   }
 
   /**
-   * Fetches community metadata (/about.json)
+   * Fetches community metadata (/api/subreddits/:name)
    */
   async getSubredditAbout(subreddit: string): Promise<NormalizedSubreddit> {
     const cleanSub = subreddit.trim().replace(/^r\//i, '').toLowerCase();
-    const url = `${this.baseUrl}/r/${cleanSub}/about.json`;
-    const rawData = await this.fetchWithFallback(url);
-    return parseSubredditAboutResponse(rawData);
+    return this.fetchApi<NormalizedSubreddit>(`/subreddits/${encodeURIComponent(cleanSub)}`);
   }
 }
 
 // Export singleton instance conforming to IRedditService
-export const redditService: IRedditService = new RedditApiService();
+export const redditService: IRedditService = new OrbitBackendApiService();
