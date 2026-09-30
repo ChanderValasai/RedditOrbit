@@ -10,6 +10,7 @@ import {
   User,
   Shield,
   LogIn,
+  RefreshCw,
 } from 'lucide-react';
 import { OrbitLogo } from './OrbitLogo';
 import { PRESET_DASHBOARDS } from '../data/mockStreams';
@@ -24,6 +25,7 @@ interface HeaderProps {
   density: StreamDensity;
   onToggleDensity: () => void;
   onOpenSettings: () => void;
+  onTriggerSync?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   density,
   onToggleDensity,
   onOpenSettings,
+  onTriggerSync,
 }) => {
   const { user, isAuthenticated, logout, openAuthModal } = useAuth();
   const [isPresetsOpen, setIsPresetsOpen] = useState(false);
@@ -234,6 +237,19 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="py-1">
+                  {onTriggerSync && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onTriggerSync();
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs text-cyan-300 hover:text-white hover:bg-[#141d2e] flex items-center gap-2 transition-colors cursor-pointer font-mono"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Sync Orbit With Cloud</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {

@@ -2,6 +2,12 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { AuthUser, LoginPayload, RegisterPayload } from '../types/auth';
 import { authClient } from '../services/authClient';
 
+interface LoginEvent {
+  user: AuthUser;
+  token: string;
+  isNewRegistration: boolean;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
@@ -9,6 +15,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthModalOpen: boolean;
   authModalMode: 'login' | 'register';
+  loginEvent: LoginEvent | null;
+  clearLoginEvent: () => void;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
@@ -24,6 +32,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+  const [loginEvent, setLoginEvent] = useState<LoginEvent | null>(null);
 
   // Verify and fetch current user on initial mount
   useEffect(() => {
@@ -59,6 +68,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(data.user);
     setToken(data.token);
     setIsAuthModalOpen(false);
+    setLoginEvent({
+      user: data.user,
+      token: data.token,
+      isNewRegistration: false,
+    });
   };
 
   const register = async (payload: RegisterPayload): Promise<void> => {
@@ -66,12 +80,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(data.user);
     setToken(data.token);
     setIsAuthModalOpen(false);
+    setLoginEvent({
+      user: data.user,
+      token: data.token,
+      isNewRegistration: true,
+    });
   };
 
   const logout = async (): Promise<void> => {
     await authClient.logout();
     setUser(null);
     setToken(null);
+    setLoginEvent(null);
+  };
+
+  const clearLoginEvent = () => {
+    setLoginEvent(null);
   };
 
   const openAuthModal = (mode: 'login' | 'register' = 'login') => {
@@ -92,6 +116,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         isAuthModalOpen,
         authModalMode,
+        loginEvent,
+        clearLoginEvent,
         login,
         register,
         logout,

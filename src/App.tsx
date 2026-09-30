@@ -7,10 +7,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   INITIAL_STREAMS,
   PRESET_DASHBOARDS,
-  MOCK_POSTS_PROGRAMMING,
-  MOCK_POSTS_JAVASCRIPT,
-  MOCK_POSTS_WEBDEV,
-  MOCK_POSTS_ML,
 } from './data/mockStreams';
 import { SubredditStream, RedditPost, SortOption, TimeRange, StreamDensity } from './types/orbit';
 import { Header } from './components/Header';
@@ -21,11 +17,20 @@ import { PostDetailModal } from './components/PostDetailModal';
 import { SearchModal } from './components/SearchModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AuthModal } from './components/AuthModal';
+import { SyncOrbitModal } from './components/SyncOrbitModal';
+import {
+  dashboardSyncService,
+  SyncAnalysisResult,
+  SyncDecision,
+} from './services/dashboardSyncService';
+import { useAuth } from './context/AuthContext';
 import { Plus, Radio, ArrowLeft, ArrowRight } from 'lucide-react';
 import { redditService } from './services/redditService';
 import { NormalizedSubreddit } from './types/reddit';
 
 export default function App() {
+  const { user, token, isAuthenticated, loginEvent, clearLoginEvent } = useAuth();
+
   const [streams, setStreams] = useState<SubredditStream[]>(() => {
     const saved = localStorage.getItem('reddit_orbit_streams');
     if (saved) {
@@ -42,11 +47,16 @@ export default function App() {
   const [density, setDensity] = useState<StreamDensity>('editorial');
   const [defaultSort, setDefaultSort] = useState<SortOption>('hot');
 
-  // Modals
+  // Modals & Synchronization state
   const [isAddStreamOpen, setIsAddStreamOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<RedditPost | null>(null);
+
+  // Sync state
+  const [activeCloudDashboardId, setActiveCloudDashboardId] = useState<string | null>(null);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [pendingSyncAnalysis, setPendingSyncAnalysis] = useState<SyncAnalysisResult | null>(null);
 
   // Status & mobile navigation
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
@@ -105,16 +115,98 @@ export default function App() {
 
   // Initial Fetch on load for all active streams
   useEffect(() => {
-    // Fetch live posts for all configured streams
     streams.forEach((s) => {
       fetchStreamData(s.id, s.name, s.sort, s.timeRange || 'day');
     });
   }, []);
 
-  // Sync to localStorage
+  // Sync to localStorage for anonymous session resilience
   useEffect(() => {
     localStorage.setItem('reddit_orbit_streams', JSON.stringify(streams));
   }, [streams]);
+
+  // When an anonymous user logs in or registers: detect local config, fetch cloud, detect conflicts, prompt decision
+  useEffect(() => {
+    if (loginEvent && loginEvent.token) {
+      const handleLoginSync = async () => {
+        try {
+          const analysis = await dashboardSyncService.analyzeSync(streams, loginEvent.token);
+          if (analysis.hasConflict) {
+            setPendingSyncAnalysis(analysis);
+            setIsSyncModalOpen(true);
+          } else {
+            // No conflict: link cloud dashboard and sync seamlessly
+            if (analysis.cloudStreams.length > 0) {
+              setStreams(analysis.cloudStreams);
+              setActiveCloudDashboardId(analysis.cloudDashboardId);
+              analysis.cloudStreams.forEach((s) => {
+                fetchStreamData(s.id, s.name, s.sort, s.timeRange || 'day');
+              });
+            } else if (streams.length > 0) {
+              const dashId = await dashboardSyncService.saveCloudDashboard(
+                analysis.cloudDashboardId,
+                analysis.cloudDashboardName,
+                streams,
+                loginEvent.token
+              );
+              setActiveCloudDashboardId(dashId);
+            }
+          }
+        } catch (err: any) {
+          console.warn('[SYNC] Error during login sync analysis:', err.message);
+        } finally {
+          clearLoginEvent();
+        }
+      };
+
+      handleLoginSync();
+    }
+  }, [loginEvent, streams, clearLoginEvent]);
+
+  // Handle user decision from SyncOrbitModal
+  const handleResolveSync = async (decision: SyncDecision) => {
+    if (!pendingSyncAnalysis || !token) return;
+    const { finalStreams, dashboardId } = await dashboardSyncService.resolveSync(
+      decision,
+      pendingSyncAnalysis,
+      token
+    );
+    setActiveCloudDashboardId(dashboardId);
+    setStreams(finalStreams);
+    setIsSyncModalOpen(false);
+    setPendingSyncAnalysis(null);
+
+    // Fetch live posts for streams that need them
+    finalStreams.forEach((s) => {
+      if (!s.posts || s.posts.length === 0) {
+        fetchStreamData(s.id, s.name, s.sort, s.timeRange || 'day');
+      }
+    });
+  };
+
+  // Manual sync trigger available in UI
+  const handleManualSyncCheck = async () => {
+    if (!token) return;
+    try {
+      const analysis = await dashboardSyncService.analyzeSync(streams, token);
+      setPendingSyncAnalysis(analysis);
+      setIsSyncModalOpen(true);
+    } catch (err: any) {
+      console.warn('[SYNC] Manual sync check error:', err.message);
+    }
+  };
+
+  // Auto-persist changes to MongoDB Atlas for authenticated users
+  useEffect(() => {
+    if (isAuthenticated && token && activeCloudDashboardId) {
+      const timer = setTimeout(() => {
+        dashboardSyncService
+          .saveCloudDashboard(activeCloudDashboardId, 'My Orbital Deck', streams, token)
+          .catch((err) => console.warn('[SYNC] Auto-save error:', err.message));
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [streams, isAuthenticated, token, activeCloudDashboardId]);
 
   // Global keyboard shortcuts (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -248,37 +340,36 @@ export default function App() {
       id: newStreamId,
       name,
       displayName: info?.displayName || `r/${name}`,
-      tagline: info?.tagline || `Community discussions and transmissions from r/${name}`,
+      tagline: info?.title || `Subreddit stream for r/${name}`,
       subscribers: info?.subscribers || 0,
       activeUsers: info?.activeUsers || 0,
-      sort: defaultSort,
+      avatarUrl: info?.iconImg,
+      sort: 'hot',
       timeRange: 'day',
       postLimit: 25,
+      posts: [],
       isCollapsed: false,
       isLoading: true,
+      error: null,
       lastSynced: now,
-      posts: [],
     };
 
     setStreams((prev) => [...prev, newStream]);
-    setActiveMobileStreamId(newStream.id);
-
-    // Fetch real live posts immediately
-    fetchStreamData(newStreamId, name, defaultSort, 'day');
+    fetchStreamData(newStreamId, name, 'hot', 'day');
   };
 
-  // Jump to stream from search
+  // Jump to stream from search modal
   const handleJumpToStream = (streamId: string) => {
     setActiveMobileStreamId(streamId);
-    const elem = document.getElementById(`lane-${streamId}`);
-    if (elem) {
-      elem.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+    const element = document.getElementById(`stream-lane-${streamId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', inline: 'start' });
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#07090e] text-[#e2e8f0] command-grid-bg selection:bg-cyan-500/25 selection:text-cyan-200">
-      {/* 1. Header */}
+      {/* 1. Header with sync trigger */}
       <Header
         currentDashboardId={currentDashboardId}
         onSelectDashboard={handleSelectDashboard}
@@ -287,6 +378,7 @@ export default function App() {
         density={density}
         onToggleDensity={() => setDensity(density === 'compact' ? 'editorial' : 'compact')}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onTriggerSync={handleManualSyncCheck}
       />
 
       {/* 2. Dashboard Status Area */}
@@ -307,96 +399,93 @@ export default function App() {
             key={stream.id}
             type="button"
             onClick={() => setActiveMobileStreamId(stream.id)}
-            className={`px-2.5 py-1 text-xs font-mono rounded-xs whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-mono rounded whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeMobileStreamId === stream.id
-                ? 'bg-cyan-600 text-white font-bold shadow-sm'
-                : 'bg-[#0f1422] text-slate-400 hover:text-white border border-[#1b2338]'
+                ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 font-semibold'
+                : 'text-slate-400 hover:text-slate-200 bg-[#0e1322] border border-[#1b253b]'
             }`}
           >
-            <span>#{idx + 1}</span>
             <span>{stream.displayName}</span>
-            <span className="text-[10px] opacity-75 tabular-nums">({stream.posts.length})</span>
+            <span className="text-[10px] text-slate-500 font-mono">
+              ({stream.posts ? stream.posts.length : 0})
+            </span>
           </button>
         ))}
         <button
           type="button"
           onClick={() => setIsAddStreamOpen(true)}
-          className="px-2 py-1 text-xs font-mono text-cyan-400 hover:text-white bg-[#0e1422] border border-cyan-800/50 rounded-xs flex items-center gap-1 shrink-0 cursor-pointer"
+          className="px-2 py-1 text-xs font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 rounded hover:bg-cyan-900/40 flex items-center gap-1 shrink-0"
         >
           <Plus className="w-3 h-3" />
-          <span>ADD</span>
+          <span>Add</span>
         </button>
       </div>
 
-      {/* 4. Main Streams Workspace */}
-      <main className="flex-1 flex flex-col min-h-0">
+      {/* 4. Multi-Stream Canvas / Horizontal Lane Rail */}
+      <main
+        ref={streamsContainerRef}
+        className="flex-1 w-full overflow-x-auto overflow-y-hidden p-3.5 sm:p-5 orbit-scroll"
+      >
         {streams.length === 0 ? (
-          /* Empty Dashboard State */
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[500px]">
-            <div className="w-16 h-16 rounded-md bg-[#0e1320] border border-[#1e273a] flex items-center justify-center text-cyan-400 mb-4 shadow-2xl">
-              <Radio className="w-8 h-8 text-cyan-400 animate-pulse" />
+          <div className="h-[calc(100vh-200px)] flex flex-col items-center justify-center text-center p-8 border border-dashed border-[#1c263c] rounded-lg bg-[#080c16]/50 max-w-xl mx-auto">
+            <div className="w-14 h-14 rounded-full bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4 animate-pulse">
+              <Radio className="w-7 h-7" />
             </div>
-            <div className="text-[11px] font-mono text-cyan-400 uppercase tracking-widest font-bold mb-1">
-              ORBIT CONSOLE // DISCONNECTED
-            </div>
-            <h2 className="text-lg font-mono font-bold uppercase tracking-tight text-white mb-2">
-              NO ACTIVE INFORMATION STREAMS
-            </h2>
-            <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
-              Your personal information space has no active frequency channels locked. Connect subreddit orbits to begin transmission monitoring.
+            <h3 className="text-base font-mono font-bold text-slate-200 uppercase tracking-wider">
+              No Subreddit Frequencies Configured
+            </h3>
+            <p className="text-xs text-slate-400 max-w-sm mt-2 font-mono leading-relaxed">
+              Your command center has no active observation streams. Add a community or load an
+              orbital preset to begin telemetry monitoring.
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mt-6">
               <button
                 type="button"
                 onClick={() => setIsAddStreamOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold text-white bg-cyan-600 hover:bg-cyan-500 rounded transition-colors shadow-md cursor-pointer"
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-semibold rounded transition-colors flex items-center gap-2 cursor-pointer shadow-lg shadow-cyan-950/40"
               >
                 <Plus className="w-4 h-4" />
-                <span>CONNECT STREAM</span>
+                <span>+ ADD FIRST STREAM</span>
               </button>
               <button
                 type="button"
-                onClick={() => setStreams(INITIAL_STREAMS)}
-                className="px-4 py-2 text-xs font-mono font-medium text-slate-300 hover:text-white bg-[#0f1422] hover:bg-[#161e30] border border-[#20293d] rounded transition-colors cursor-pointer"
+                onClick={() => handleSelectDashboard('core-engineering')}
+                className="px-4 py-2 bg-[#121929] hover:bg-[#182338] border border-[#212f4c] text-cyan-300 text-xs font-mono rounded transition-colors cursor-pointer"
               >
-                LOAD DEFAULT FREQUENCIES
+                Load Core Engineering
               </button>
             </div>
           </div>
         ) : (
-          /* Populated Streams Workspace */
-          <div
-            ref={streamsContainerRef}
-            className="flex-1 overflow-x-auto orbit-scroll p-3 sm:p-5 md:p-6"
-          >
-            {/* Desktop Horizontal View & Mobile Single-Column Responsive Switch */}
-            <div className="flex items-start gap-4 h-full">
+          <div className="h-full min-h-[calc(100vh-140px)] flex">
+            {/* Desktop: Horizontal Lane Rail | Mobile: Selected Stream Only */}
+            <div className="flex gap-4 sm:gap-5 w-full items-stretch">
               {streams.map((stream, index) => {
-                const isMobileVisible = activeMobileStreamId === stream.id;
+                const isMobileVisible = stream.id === activeMobileStreamId;
+
                 return (
                   <div
                     key={stream.id}
-                    id={`lane-${stream.id}`}
-                    className={`h-full ${
-                      isMobileVisible ? 'block w-full' : 'hidden lg:block'
+                    id={`stream-lane-${stream.id}`}
+                    className={`h-[calc(100vh-120px)] transition-all duration-200 ${
+                      isMobileVisible ? 'flex flex-1 lg:flex-none' : 'hidden lg:flex'
                     }`}
                   >
                     <StreamLane
                       stream={stream}
                       density={density}
-                      streamIndex={index}
-                      canMoveLeft={index > 0}
-                      canMoveRight={index < streams.length - 1}
+                      onRefresh={() => handleRefreshStream(stream.id)}
+                      onChangeSort={(sort) => handleChangeSort(stream.id, sort)}
+                      onChangeTimeRange={(time) => handleChangeTimeRange(stream.id, time)}
+                      onToggleCollapse={() => handleToggleCollapse(stream.id)}
                       onMoveLeft={() => handleMoveStream(index, 'left')}
                       onMoveRight={() => handleMoveStream(index, 'right')}
                       onRemove={() => handleRemoveStream(stream.id)}
                       onDuplicate={() => handleDuplicateStream(stream)}
-                      onRefresh={() => handleRefreshStream(stream.id)}
-                      onChangeSort={(sort) => handleChangeSort(stream.id, sort)}
-                      onChangeTimeRange={(timeRange) => handleChangeTimeRange(stream.id, timeRange)}
-                      onToggleCollapse={() => handleToggleCollapse(stream.id)}
                       onSelectPost={(post) => setSelectedPost(post)}
                       onSimulateState={(type) => handleSimulateState(stream.id, type)}
+                      canMoveLeft={index > 0}
+                      canMoveRight={index < streams.length - 1}
                     />
                   </div>
                 );
@@ -456,6 +545,13 @@ export default function App() {
       />
 
       <AuthModal />
+
+      {/* 6. Anonymous to Authenticated Synchronization Modal */}
+      <SyncOrbitModal
+        isOpen={isSyncModalOpen}
+        analysis={pendingSyncAnalysis}
+        onResolve={handleResolveSync}
+      />
     </div>
   );
 }
