@@ -5,6 +5,12 @@ export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
+  mongodb: {
+    uri: process.env.MONGODB_URI || '',
+    dbName: process.env.MONGODB_DB_NAME || 'reddit_orbit',
+    maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE || '10', 10),
+    serverSelectionTimeoutMS: parseInt(process.env.MONGODB_TIMEOUT_MS || '5000', 10),
+  },
   reddit: {
     baseUrl: process.env.REDDIT_BASE_URL || 'https://www.reddit.com',
     userAgent: process.env.REDDIT_USER_AGENT || 'web:reddit-orbit:v1.0.0 (by /u/orbit_bot)',

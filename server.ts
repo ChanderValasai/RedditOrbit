@@ -4,17 +4,21 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { createExpressApp } from './server/app';
 import { config } from './server/config/env';
+import { connectDatabase } from './server/db/connection';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  // Initialize database connection gracefully (will not block server startup)
+  await connectDatabase();
+
   const app = createExpressApp();
   const isProd = config.isProduction;
   const port = config.port;
 
   if (!isProd) {
-    // In development, mount Vite middleware for instant HMR / dev bundling
+    // In development, mount Vite middleware for instant dev bundling
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -39,7 +43,7 @@ async function startServer() {
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`[Reddit Orbit] Server running in ${config.nodeEnv} mode at http://0.0.0.0:${port}`);
-    console.log(`[Reddit Orbit] API routes available under /api/subreddits`);
+    console.log(`[Reddit Orbit] API routes available under /api`);
   });
 }
 

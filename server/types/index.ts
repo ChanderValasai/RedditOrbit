@@ -57,6 +57,7 @@ export type ErrorCode =
   | 'PRIVATE_COMMUNITY'
   | 'RATE_LIMITED'
   | 'UPSTREAM_ERROR'
+  | 'FORBIDDEN'
   | 'INTERNAL_ERROR';
 
 export class AppError extends Error {
