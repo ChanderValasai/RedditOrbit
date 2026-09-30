@@ -1,0 +1,6 @@
+{
+  "name": "Reddit Orbit",
+  "description": "Multi-stream Reddit information dashboard for monitoring communities in configurable orbits.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
