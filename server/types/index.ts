@@ -58,7 +58,18 @@ export type ErrorCode =
   | 'RATE_LIMITED'
   | 'UPSTREAM_ERROR'
   | 'FORBIDDEN'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'UNAUTHORIZED'
+  | 'MISSING_TOKEN'
+  | 'MALFORMED_TOKEN'
+  | 'TOKEN_EXPIRED'
+  | 'INVALID_TOKEN'
+  | 'INVALID_CREDENTIALS'
+  | 'DUPLICATE_EMAIL'
+  | 'INVALID_EMAIL'
+  | 'INVALID_PASSWORD'
+  | 'INVALID_NAME'
+  | 'USER_NOT_FOUND';
 
 export class AppError extends Error {
   public statusCode: number;

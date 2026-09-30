@@ -2,12 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import { dashboardService } from '../services/dashboardService';
 
 export class DashboardController {
+  private getEffectiveUserId(req: Request): string {
+    if (req.user && req.user.userId) {
+      return req.user.userId;
+    }
+    return (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'guest_user';
+  }
+
   /**
    * GET /api/dashboards
    */
   async list(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'guest_user';
+      const userId = this.getEffectiveUserId(req);
       const dashboards = await dashboardService.listDashboards(userId);
       res.json({
         success: true,
@@ -24,7 +31,7 @@ export class DashboardController {
   async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+      const userId = this.getEffectiveUserId(req);
       const dashboard = await dashboardService.getDashboardById(id, userId);
       res.json({
         success: true,
@@ -41,7 +48,7 @@ export class DashboardController {
   async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name, streams, isDefault } = req.body;
-      const userId = req.body.userId || (req.headers['x-user-id'] as string) || 'guest_user';
+      const userId = req.user?.userId || req.body.userId || 'guest_user';
 
       const dashboard = await dashboardService.createDashboard({
         name,
@@ -66,7 +73,7 @@ export class DashboardController {
     try {
       const { id } = req.params;
       const { name, streams, isDefault } = req.body;
-      const userId = req.body.userId || (req.headers['x-user-id'] as string);
+      const userId = this.getEffectiveUserId(req);
 
       const dashboard = await dashboardService.updateDashboard(
         id,
@@ -89,7 +96,7 @@ export class DashboardController {
   async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+      const userId = this.getEffectiveUserId(req);
       const result = await dashboardService.deleteDashboard(id, userId);
       res.json({
         success: true,
@@ -107,7 +114,7 @@ export class DashboardController {
     try {
       const { id } = req.params;
       const streamData = req.body;
-      const userId = req.body.userId || (req.headers['x-user-id'] as string);
+      const userId = this.getEffectiveUserId(req);
 
       const dashboard = await dashboardService.addStream(id, streamData, userId);
       res.status(201).json({
@@ -125,7 +132,7 @@ export class DashboardController {
   async removeStream(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id, streamId } = req.params;
-      const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+      const userId = this.getEffectiveUserId(req);
 
       const dashboard = await dashboardService.removeStream(id, streamId, userId);
       res.json({

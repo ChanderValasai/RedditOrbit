@@ -32,4 +32,8 @@ export const config = {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10), // 1 minute
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX || '60', 10), // 60 requests per minute
   },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'reddit-orbit-secret-key-development-2026',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  },
 };

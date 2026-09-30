@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import { dashboardController } from '../controllers/dashboardController';
+import { optionalAuth } from '../middleware/authMiddleware';
 
 const router = Router();
+
+// Protect all dashboard routes with optionalAuth:
+// If a token is supplied, validate it strictly (rejecting expired or malformed tokens).
+// If no token is supplied, allow anonymous/guest usage without breaking anything.
+router.use(optionalAuth);
 
 // Dashboard CRUD routes
 router.get('/', (req, res, next) => dashboardController.list(req, res, next));

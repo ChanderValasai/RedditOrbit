@@ -4,19 +4,17 @@ import {
   Plus,
   SlidersHorizontal,
   ChevronDown,
-  Layers,
-  Sparkles,
-  Command,
-  Sun,
-  Moon,
-  Laptop,
-  Radio,
   Activity,
   Terminal,
+  LogOut,
+  User,
+  Shield,
+  LogIn,
 } from 'lucide-react';
 import { OrbitLogo } from './OrbitLogo';
 import { PRESET_DASHBOARDS } from '../data/mockStreams';
 import { StreamDensity } from '../types/orbit';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   currentDashboardId: string;
@@ -37,8 +35,12 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleDensity,
   onOpenSettings,
 }) => {
+  const { user, isAuthenticated, logout, openAuthModal } = useAuth();
   const [isPresetsOpen, setIsPresetsOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const activeDashboard =
     PRESET_DASHBOARDS.find((d) => d.id === currentDashboardId) || PRESET_DASHBOARDS[0];
@@ -48,10 +50,23 @@ export const Header: React.FC<HeaderProps> = ({
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsPresetsOpen(false);
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Compute user initials
+  const initials = user?.displayName
+    ? user.displayName
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : 'ORB';
 
   return (
     <header className="sticky top-0 z-40 w-full h-13 bg-[#080b12]/95 backdrop-blur-md border-b border-[#181f2f] px-3.5 sm:px-6 flex items-center justify-between">
@@ -68,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Technical Divider */}
         <div className="hidden sm:block h-4 w-px bg-[#1e273a]" />
 
-        {/* Dashboard Preset Selector (Contextual telemetry indicator) */}
+        {/* Dashboard Preset Selector */}
         <div className="relative hidden md:block" ref={dropdownRef}>
           <button
             type="button"
@@ -123,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Zone 2: Command Search trigger with precision terminal aesthetics */}
+      {/* Zone 2: Command Search trigger */}
       <div className="flex-1 max-w-sm lg:max-w-md mx-3 sm:mx-6 hidden sm:block">
         <button
           type="button"
@@ -144,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Zone 3: Actions & Controls */}
+      {/* Zone 3: Actions, Auth & Controls */}
       <div className="flex items-center gap-2">
         {/* Telemetry Operational Status beacon (Desktop) */}
         <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 text-[11px] font-mono text-slate-400 bg-[#0e1320] border border-[#1d263a] rounded">
@@ -185,18 +200,92 @@ export const Header: React.FC<HeaderProps> = ({
           <span>+ STREAM</span>
         </button>
 
-        {/* Workspace Settings / User Menu */}
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          className="p-1 text-slate-400 hover:text-white hover:bg-[#131929] border border-[#1e273c] rounded transition-colors"
-          title="Telemetry & Layout Settings"
-          aria-label="Settings"
-        >
-          <div className="w-6 h-6 rounded bg-[#131b2c] border border-[#25324d] flex items-center justify-center text-[10px] font-mono font-bold text-cyan-400">
-            ORB
+        {/* Authentication State / User Menu */}
+        {isAuthenticated && user ? (
+          <div className="relative" ref={userMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-2 p-1 text-slate-300 hover:text-white hover:bg-[#131929] border border-[#1e273c] hover:border-cyan-500/40 rounded transition-colors cursor-pointer"
+              title={`Pilot: ${user.displayName}`}
+              aria-label="User profile menu"
+            >
+              <div className="w-6 h-6 rounded bg-gradient-to-tr from-cyan-900 to-indigo-900 border border-cyan-500/40 flex items-center justify-center text-[10px] font-mono font-bold text-cyan-200">
+                {initials}
+              </div>
+              <span className="hidden lg:inline text-xs font-mono font-medium max-w-[100px] truncate text-slate-200">
+                {user.displayName.split(' ')[0]}
+              </span>
+              <ChevronDown className="w-3 h-3 text-slate-400 hidden lg:inline" />
+            </button>
+
+            {isUserMenuOpen && (
+              <div className="absolute right-0 mt-1.5 w-56 bg-[#0c101c] border border-[#222d44] rounded shadow-2xl py-1 z-50 divide-y divide-[#182236]">
+                <div className="px-3 py-2">
+                  <p className="text-xs font-semibold text-slate-200 truncate">{user.displayName}</p>
+                  <p className="text-[11px] font-mono text-cyan-400 truncate mt-0.5">{user.email}</p>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 bg-cyan-950/70 border border-cyan-500/30 text-cyan-300 text-[9px] font-mono rounded">
+                      <Shield className="w-2.5 h-2.5" />
+                      {user.role.toUpperCase()}
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-400">ATLAS SYNCED</span>
+                  </div>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onOpenSettings();
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-[#141d2e] flex items-center gap-2 transition-colors"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Workspace Settings</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsUserMenuOpen(false);
+                      await logout();
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/20 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </button>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => openAuthModal('login')}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono text-cyan-300 hover:text-white bg-[#0e1424] hover:bg-[#141e34] border border-cyan-500/30 hover:border-cyan-400/60 rounded transition-colors cursor-pointer"
+              title="Sign in to save personal dashboards"
+            >
+              <LogIn className="w-3 h-3 text-cyan-400" />
+              <span>SIGN IN</span>
+            </button>
+
+            {/* Settings Button */}
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="p-1 text-slate-400 hover:text-white hover:bg-[#131929] border border-[#1e273c] rounded transition-colors"
+              title="Telemetry & Layout Settings"
+              aria-label="Settings"
+            >
+              <div className="w-6 h-6 rounded bg-[#131b2c] border border-[#25324d] flex items-center justify-center text-[10px] font-mono font-bold text-cyan-400">
+                ORB
+              </div>
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

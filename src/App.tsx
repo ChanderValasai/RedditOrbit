@@ -20,6 +20,7 @@ import { AddStreamModal } from './components/AddStreamModal';
 import { PostDetailModal } from './components/PostDetailModal';
 import { SearchModal } from './components/SearchModal';
 import { SettingsModal } from './components/SettingsModal';
+import { AuthModal } from './components/AuthModal';
 import { Plus, Radio, ArrowLeft, ArrowRight } from 'lucide-react';
 import { redditService } from './services/redditService';
 import { NormalizedSubreddit } from './types/reddit';
@@ -453,6 +454,8 @@ export default function App() {
         defaultSort={defaultSort}
         onChangeDefaultSort={(s) => setDefaultSort(s)}
       />
+
+      <AuthModal />
     </div>
   );
 }
