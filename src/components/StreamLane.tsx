@@ -20,7 +20,7 @@ import {
   Activity,
   Terminal,
 } from 'lucide-react';
-import { SubredditStream, RedditPost, SortOption, StreamDensity } from '../types/orbit';
+import { SubredditStream, RedditPost, SortOption, TimeRange, StreamDensity } from '../types/orbit';
 import { PostCard } from './PostCard';
 import { formatNumber } from '../utils/formatters';
 
@@ -35,6 +35,7 @@ interface StreamLaneProps {
   onDuplicate: () => void;
   onRefresh: () => void;
   onChangeSort: (sort: SortOption) => void;
+  onChangeTimeRange?: (timeRange: TimeRange) => void;
   onToggleCollapse: () => void;
   onSelectPost: (post: RedditPost) => void;
   onSimulateState?: (type: 'normal' | 'empty' | 'error') => void;
@@ -52,6 +53,7 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
   onDuplicate,
   onRefresh,
   onChangeSort,
+  onChangeTimeRange,
   onToggleCollapse,
   onSelectPost,
   onSimulateState,
@@ -316,6 +318,40 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
             {stream.posts.length} TRANSMISSIONS
           </span>
         </div>
+
+        {/* Top Time Range Selector (shown when Top is active) */}
+        {stream.sort === 'top' && (
+          <div className="mt-1.5 pt-1.5 border-t border-[#141b2c] flex items-center justify-between text-[10px] font-mono">
+            <span className="text-cyan-400 font-bold">RANGE:</span>
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  { id: 'day', label: 'Day' },
+                  { id: 'week', label: 'Week' },
+                  { id: 'month', label: 'Month' },
+                  { id: 'year', label: 'Year' },
+                  { id: 'all', label: 'All' },
+                ] as { id: TimeRange; label: string }[]
+              ).map((t) => {
+                const isSelected = (stream.timeRange || 'day') === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => onChangeTimeRange && onChangeTimeRange(t.id)}
+                    className={`px-1.5 py-0.5 rounded-xs transition-colors uppercase ${
+                      isSelected
+                        ? 'bg-cyan-500/20 text-cyan-300 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Stream Content Area */}

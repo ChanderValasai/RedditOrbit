@@ -1,28 +1,15 @@
-export type SortOption = 'hot' | 'new' | 'top' | 'rising';
+import {
+  NormalizedPost,
+  RedditSortOption,
+  RedditTimeRange,
+  PaginationInfo,
+} from './reddit';
 
-export type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'year' | 'all';
-
+export type SortOption = RedditSortOption;
+export type TimeRange = RedditTimeRange;
 export type StreamDensity = 'compact' | 'editorial';
 
-export interface RedditPost {
-  id: string;
-  subreddit: string;
-  title: string;
-  author: string;
-  score: number;
-  upvoteRatio: number;
-  numComments: number;
-  createdUtc: number; // timestamp in seconds
-  permalink: string;
-  url: string;
-  selftext?: string;
-  isSelf: boolean;
-  thumbnail?: string;
-  domain: string;
-  flair?: string;
-  isNsfw?: boolean;
-  isPinned?: boolean;
-}
+export type RedditPost = NormalizedPost;
 
 export interface SubredditStream {
   id: string;
@@ -35,6 +22,7 @@ export interface SubredditStream {
   sort: SortOption;
   timeRange?: TimeRange;
   postLimit: number;
+  afterCursor?: string | null;
   isCollapsed?: boolean;
   isLoading?: boolean;
   error?: string | null;
@@ -48,3 +36,4 @@ export interface DashboardPreset {
   description: string;
   streamNames: string[];
 }
+

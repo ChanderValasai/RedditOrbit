@@ -12,7 +12,7 @@ import {
   MOCK_POSTS_WEBDEV,
   MOCK_POSTS_ML,
 } from './data/mockStreams';
-import { SubredditStream, RedditPost, SortOption, StreamDensity } from './types/orbit';
+import { SubredditStream, RedditPost, SortOption, TimeRange, StreamDensity } from './types/orbit';
 import { Header } from './components/Header';
 import { DashboardStatus } from './components/DashboardStatus';
 import { StreamLane } from './components/StreamLane';
@@ -21,6 +21,8 @@ import { PostDetailModal } from './components/PostDetailModal';
 import { SearchModal } from './components/SearchModal';
 import { SettingsModal } from './components/SettingsModal';
 import { Plus, Radio, ArrowLeft, ArrowRight } from 'lucide-react';
+import { redditService } from './services/redditService';
+import { NormalizedSubreddit } from './types/reddit';
 
 export default function App() {
   const [streams, setStreams] = useState<SubredditStream[]>(() => {
@@ -52,6 +54,61 @@ export default function App() {
   );
 
   const streamsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Core Data Fetching via clean redditService abstraction
+  const fetchStreamData = async (
+    streamId: string,
+    subName: string,
+    sort: SortOption = 'hot',
+    timeRange: TimeRange = 'day'
+  ) => {
+    setStreams((prev) =>
+      prev.map((s) => (s.id === streamId ? { ...s, isLoading: true, error: null } : s))
+    );
+
+    try {
+      const result = await redditService.getSubredditPosts(subName, {
+        sort,
+        timeRange,
+        limit: 25,
+      });
+
+      setStreams((prev) =>
+        prev.map((s) => {
+          if (s.id !== streamId) return s;
+          return {
+            ...s,
+            sort,
+            timeRange,
+            posts: result.posts,
+            afterCursor: result.pagination.after,
+            isLoading: false,
+            error: null,
+            lastSynced: Math.floor(Date.now() / 1000),
+          };
+        })
+      );
+    } catch (err: any) {
+      setStreams((prev) =>
+        prev.map((s) => {
+          if (s.id !== streamId) return s;
+          return {
+            ...s,
+            isLoading: false,
+            error: err.message || 'Signal lost during transmission',
+          };
+        })
+      );
+    }
+  };
+
+  // Initial Fetch on load for all active streams
+  useEffect(() => {
+    // Fetch live posts for all configured streams
+    streams.forEach((s) => {
+      fetchStreamData(s.id, s.name, s.sort, s.timeRange || 'day');
+    });
+  }, []);
 
   // Sync to localStorage
   useEffect(() => {
@@ -85,7 +142,13 @@ export default function App() {
 
     // Filter or re-populate matching streams
     const matched = INITIAL_STREAMS.filter((s) => preset.streamNames.includes(s.name));
-    setStreams(matched.length > 0 ? matched : INITIAL_STREAMS);
+    const newStreamsList = matched.length > 0 ? matched : INITIAL_STREAMS;
+    setStreams(newStreamsList);
+
+    // Fetch live posts for newly selected preset streams
+    newStreamsList.forEach((s) => {
+      fetchStreamData(s.id, s.name, s.sort, s.timeRange || 'day');
+    });
   };
 
   // Reordering streams
@@ -102,65 +165,32 @@ export default function App() {
 
   // Refresh single stream
   const handleRefreshStream = (streamId: string) => {
-    setStreams((prev) =>
-      prev.map((s) => (s.id === streamId ? { ...s, isLoading: true, error: null } : s))
-    );
-
-    setTimeout(() => {
-      setStreams((prev) =>
-        prev.map((s) => {
-          if (s.id !== streamId) return s;
-          return {
-            ...s,
-            isLoading: false,
-            lastSynced: Math.floor(Date.now() / 1000),
-          };
-        })
-      );
-    }, 550);
+    const stream = streams.find((s) => s.id === streamId);
+    if (!stream) return;
+    fetchStreamData(stream.id, stream.name, stream.sort, stream.timeRange || 'day');
   };
 
   // Refresh all streams
-  const handleRefreshAll = () => {
+  const handleRefreshAll = async () => {
     setIsRefreshingAll(true);
-    setStreams((prev) => prev.map((s) => ({ ...s, isLoading: true, error: null })));
-
-    setTimeout(() => {
-      setStreams((prev) =>
-        prev.map((s) => ({
-          ...s,
-          isLoading: false,
-          lastSynced: Math.floor(Date.now() / 1000),
-        }))
-      );
-      setIsRefreshingAll(false);
-    }, 700);
+    await Promise.all(
+      streams.map((s) => fetchStreamData(s.id, s.name, s.sort, s.timeRange || 'day'))
+    );
+    setIsRefreshingAll(false);
   };
 
-  // Change stream sort
+  // Change stream sort (Hot, New, Top, Rising)
   const handleChangeSort = (streamId: string, sort: SortOption) => {
-    setStreams((prev) =>
-      prev.map((s) => {
-        if (s.id !== streamId) return s;
-        // Simulate sorting posts
-        const sortedPosts = [...s.posts];
-        if (sort === 'top') {
-          sortedPosts.sort((a, b) => b.score - a.score);
-        } else if (sort === 'new') {
-          sortedPosts.sort((a, b) => b.createdUtc - a.createdUtc);
-        } else if (sort === 'rising') {
-          sortedPosts.sort((a, b) => b.numComments - a.numComments);
-        } else {
-          // Hot
-          sortedPosts.sort((a, b) => b.score * 0.7 + b.numComments * 0.3 - (a.score * 0.7 + a.numComments * 0.3));
-        }
-        return {
-          ...s,
-          sort,
-          posts: sortedPosts,
-        };
-      })
-    );
+    const stream = streams.find((s) => s.id === streamId);
+    if (!stream) return;
+    fetchStreamData(streamId, stream.name, sort, stream.timeRange || 'day');
+  };
+
+  // Change Top time range (day, week, month, year, all)
+  const handleChangeTimeRange = (streamId: string, timeRange: TimeRange) => {
+    const stream = streams.find((s) => s.id === streamId);
+    if (!stream) return;
+    fetchStreamData(streamId, stream.name, 'top', timeRange);
   };
 
   // Toggle Collapse
@@ -183,6 +213,7 @@ export default function App() {
       displayName: `${stream.displayName} (Copy)`,
     };
     setStreams((prev) => [...prev, duplicated]);
+    fetchStreamData(duplicated.id, stream.name, stream.sort, stream.timeRange || 'day');
   };
 
   // State Simulation Demo (Empty, Error, Normal)
@@ -194,75 +225,45 @@ export default function App() {
           return { ...s, error: null, posts: [] };
         }
         if (type === 'error') {
-          return { ...s, error: 'Network timeout', posts: [] };
+          return { ...s, error: 'Carrier drop: feed timeout (504)', posts: [] };
         }
-        // normal restore
-        const sourcePosts =
-          s.name === 'programming'
-            ? MOCK_POSTS_PROGRAMMING
-            : s.name === 'javascript'
-            ? MOCK_POSTS_JAVASCRIPT
-            : s.name === 'webdev'
-            ? MOCK_POSTS_WEBDEV
-            : MOCK_POSTS_ML;
-        return { ...s, error: null, posts: sourcePosts };
+        return s;
       })
     );
+    if (type === 'normal') {
+      const stream = streams.find((s) => s.id === streamId);
+      if (stream) {
+        fetchStreamData(streamId, stream.name, stream.sort, stream.timeRange || 'day');
+      }
+    }
   };
 
-  // Add new stream
-  const handleAddStream = (name: string) => {
+  // Add new stream (connected to real reddit data)
+  const handleAddStream = (name: string, info?: NormalizedSubreddit) => {
     const now = Math.floor(Date.now() / 1000);
+    const newStreamId = `stream-${name}-${Date.now()}`;
+
     const newStream: SubredditStream = {
-      id: `stream-${name}-${Date.now()}`,
+      id: newStreamId,
       name,
-      displayName: `r/${name}`,
-      tagline: `Community discussions, links and news from r/${name}`,
-      subscribers: 850000,
-      activeUsers: 950,
+      displayName: info?.displayName || `r/${name}`,
+      tagline: info?.tagline || `Community discussions and transmissions from r/${name}`,
+      subscribers: info?.subscribers || 0,
+      activeUsers: info?.activeUsers || 0,
       sort: defaultSort,
+      timeRange: 'day',
       postLimit: 25,
       isCollapsed: false,
+      isLoading: true,
       lastSynced: now,
-      posts: [
-        {
-          id: `${name}-1`,
-          subreddit: name,
-          title: `Welcome to the r/${name} information stream in Reddit Orbit`,
-          author: 'orbit_curator',
-          score: 1420,
-          upvoteRatio: 0.98,
-          numComments: 112,
-          createdUtc: now - 3600,
-          permalink: `https://reddit.com/r/${name}`,
-          url: `https://reddit.com/r/${name}`,
-          selftext: `This stream is now connected to your dashboard workspace. Orbit will monitor r/${name} in real-time.`,
-          isSelf: true,
-          domain: `self.${name}`,
-          flair: 'Announce',
-          isPinned: true,
-        },
-        {
-          id: `${name}-2`,
-          subreddit: name,
-          title: `Architectural trends and best engineering practices for r/${name} in 2026`,
-          author: 'senior_eng',
-          score: 890,
-          upvoteRatio: 0.95,
-          numComments: 84,
-          createdUtc: now - 7200,
-          permalink: `https://reddit.com/r/${name}`,
-          url: `https://reddit.com/r/${name}`,
-          selftext: 'Comparing runtime overhead, memory profiles, and ecosystem maturity across the latest releases.',
-          isSelf: true,
-          domain: `self.${name}`,
-          flair: 'Guide',
-        },
-      ],
+      posts: [],
     };
 
     setStreams((prev) => [...prev, newStream]);
     setActiveMobileStreamId(newStream.id);
+
+    // Fetch real live posts immediately
+    fetchStreamData(newStreamId, name, defaultSort, 'day');
   };
 
   // Jump to stream from search
@@ -391,6 +392,7 @@ export default function App() {
                       onDuplicate={() => handleDuplicateStream(stream)}
                       onRefresh={() => handleRefreshStream(stream.id)}
                       onChangeSort={(sort) => handleChangeSort(stream.id, sort)}
+                      onChangeTimeRange={(timeRange) => handleChangeTimeRange(stream.id, timeRange)}
                       onToggleCollapse={() => handleToggleCollapse(stream.id)}
                       onSelectPost={(post) => setSelectedPost(post)}
                       onSimulateState={(type) => handleSimulateState(stream.id, type)}

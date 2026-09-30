@@ -14,11 +14,14 @@ import {
 } from 'lucide-react';
 import { SUGGESTED_SUBREDDITS } from '../data/mockStreams';
 import { SubredditStream } from '../types/orbit';
+import { redditService } from '../services/redditService';
+import { NormalizedSubreddit } from '../types/reddit';
+import { formatNumber } from '../utils/formatters';
 
 interface AddStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddStream: (name: string) => void;
+  onAddStream: (name: string, info?: NormalizedSubreddit) => void;
   existingStreamNames: string[];
 }
 
@@ -48,7 +51,7 @@ export const AddStreamModal: React.FC<AddStreamModalProps> = ({
 
   const cleanName = query.trim().replace(/^r\//i, '').toLowerCase();
 
-  const handleValidateAndAdd = (targetName?: string) => {
+  const handleValidateAndAdd = async (targetName?: string) => {
     const nameToAdd = (targetName || cleanName).trim().toLowerCase();
     if (!nameToAdd) return;
 
@@ -58,46 +61,41 @@ export const AddStreamModal: React.FC<AddStreamModalProps> = ({
       return;
     }
 
-    const knownSubreddits = [
-      'programming',
-      'javascript',
-      'webdev',
-      'machinelearning',
-      'rust',
-      'datascience',
-      'reactjs',
-      'linux',
-      'sysadmin',
-      'devops',
-      'python',
-      'typescript',
-      'golang',
-      'compsci',
-      'technology',
-    ];
-
     setStatus('checking');
-    setStatusMessage('SCANNING ORBIT SPECTRUM // VERIFYING COMMUNITY ENDPOINT...');
+    setStatusMessage('SCANNING ORBIT SPECTRUM // QUERYING REDDIT API...');
 
-    setTimeout(() => {
-      if (!knownSubreddits.includes(nameToAdd) && nameToAdd.length < 3) {
+    try {
+      const validation = await redditService.validateSubreddit(nameToAdd);
+
+      if (!validation.exists) {
         setStatus('error');
-        setStatusMessage('SPECTRUM NOT FOUND: Verify spelling or specify another active community.');
+        setStatusMessage(
+          validation.error || 'SPECTRUM NOT FOUND: Verify spelling or try another community.'
+        );
         return;
       }
 
+      const info = validation.info;
+      const readersText =
+        info?.subscribers && info.subscribers > 0
+          ? ` (${formatNumber(info.subscribers)} readers)`
+          : '';
+
       setStatus('found');
-      setStatusMessage(`COMMUNITY DETECTED: r/${nameToAdd} · BUFFERING FEED PACKETS...`);
+      setStatusMessage(`COMMUNITY DETECTED: r/${nameToAdd}${readersText} · LOCKING ORBIT...`);
 
       setTimeout(() => {
         setStatus('success');
         setStatusMessage(`ORBIT LOCKED: Added r/${nameToAdd} to your information space!`);
         setTimeout(() => {
-          onAddStream(nameToAdd);
+          onAddStream(nameToAdd, info);
           onClose();
-        }, 550);
-      }, 650);
-    }, 550);
+        }, 450);
+      }, 550);
+    } catch (err: any) {
+      setStatus('error');
+      setStatusMessage(err.message || 'Signal lost during subreddit validation.');
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
