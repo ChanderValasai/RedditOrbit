@@ -19,6 +19,7 @@ import {
   WifiOff,
   Activity,
   Terminal,
+  GripVertical,
 } from 'lucide-react';
 import { SubredditStream, RedditPost, SortOption, TimeRange, StreamDensity } from '../types/orbit';
 import { PostCard } from './PostCard';
@@ -40,6 +41,8 @@ interface StreamLaneProps {
   onSelectPost: (post: RedditPost) => void;
   onSimulateState?: (type: 'normal' | 'empty' | 'error') => void;
   streamIndex?: number;
+  dragHandleProps?: Record<string, any>;
+  isDragOverlay?: boolean;
 }
 
 export const StreamLane: React.FC<StreamLaneProps> = ({
@@ -58,6 +61,8 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
   onSelectPost,
   onSimulateState,
   streamIndex = 0,
+  dragHandleProps,
+  isDragOverlay,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -91,8 +96,19 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
 
   if (stream.isCollapsed) {
     return (
-      <div className={`shrink-0 w-16 md:w-18 bg-[#0b0e16] border border-[#1b2234] border-t-2 ${accentClass} rounded-sm flex flex-col items-center py-4 justify-between select-none h-full max-h-[calc(100vh-125px)]`}>
-        <div className="flex flex-col items-center gap-3">
+      <div className={`shrink-0 w-16 md:w-18 bg-[#0b0e16] border border-[#1b2234] border-t-2 ${accentClass} ${isDragOverlay ? 'ring-2 ring-cyan-400 border-cyan-400 shadow-2xl shadow-cyan-500/40' : ''} rounded-sm flex flex-col items-center py-4 justify-between select-none h-full max-h-[calc(100vh-125px)]`}>
+        <div className="flex flex-col items-center gap-2">
+          {dragHandleProps && (
+            <button
+              type="button"
+              {...dragHandleProps}
+              className="p-1 text-slate-500 hover:text-cyan-400 hover:bg-[#141b2b] rounded transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
+              title="Drag to reorder stream"
+              aria-label={`Drag stream ${stream.name} to reorder`}
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             type="button"
             onClick={onToggleCollapse}
@@ -118,7 +134,7 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
   }
 
   return (
-    <section className={`shrink-0 w-full sm:w-[380px] lg:w-[415px] xl:w-[435px] flex flex-col bg-[#0b0e16] border border-[#1a2133] border-t-2 ${accentClass} rounded-sm overflow-hidden h-[calc(100vh-120px)] shadow-xl transition-all`}>
+    <section className={`shrink-0 w-full sm:w-[380px] lg:w-[415px] xl:w-[435px] flex flex-col bg-[#0b0e16] border border-[#1a2133] border-t-2 ${accentClass} ${isDragOverlay ? 'ring-2 ring-cyan-400 border-cyan-400 shadow-2xl shadow-cyan-500/40 opacity-95' : ''} rounded-sm overflow-hidden h-[calc(100vh-120px)] shadow-xl transition-all`}>
       {/* Stream Top Header with Telemetry Bar */}
       <header className="px-3.5 py-2.5 border-b border-[#182032] bg-[#0e121e] select-none">
         <div className="flex items-start justify-between gap-2">
@@ -147,6 +163,19 @@ export const StreamLane: React.FC<StreamLaneProps> = ({
 
           {/* Stream Actions */}
           <div className="flex items-center gap-1 shrink-0 pt-0.5">
+            {/* Drag Handle */}
+            {dragHandleProps && (
+              <button
+                type="button"
+                {...dragHandleProps}
+                className="p-1.5 text-slate-500 hover:text-cyan-400 hover:bg-[#161c2e] rounded transition-colors cursor-grab active:cursor-grabbing focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-400 touch-none select-none"
+                title="Drag to reorder stream lane (or use keyboard: Tab, Space, Arrow keys)"
+                aria-label={`Drag stream r/${stream.name} to reorder`}
+              >
+                <GripVertical className="w-3.5 h-3.5" />
+              </button>
+            )}
+
             {/* Refresh */}
             <button
               type="button"

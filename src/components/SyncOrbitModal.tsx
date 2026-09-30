@@ -140,8 +140,46 @@ export const SyncOrbitModal: React.FC<SyncOrbitModalProps> = ({
           </div>
 
           {/* Merge Decision Action Buttons */}
-          <div className="pt-2 space-y-2">
-            {/* 1. Merge (Recommended) */}
+          <div className="pt-2 space-y-2.5">
+            {/* 1. [Use Local] */}
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => handleChoose('use_local')}
+              className="w-full py-2.5 px-4 rounded bg-[#101728] hover:bg-[#141e33] active:bg-[#0c1220] border border-[#22304c] hover:border-cyan-500/50 disabled:opacity-50 text-slate-200 font-mono text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-2.5">
+                <HardDrive className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                <span className="font-bold text-cyan-300">
+                  {isSubmitting && selectedDecision === 'use_local' ? 'SAVING LOCAL...' : '[Use Local]'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-normal font-sans hidden sm:inline">
+                  — Keep local ({analysis.localSummary.count} {analysis.localSummary.count === 1 ? 'stream' : 'streams'}) and save to Cloud
+                </span>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-300 transition-colors" />
+            </button>
+
+            {/* 2. [Use Cloud] */}
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => handleChoose('use_cloud')}
+              className="w-full py-2.5 px-4 rounded bg-[#101728] hover:bg-[#141e33] active:bg-[#0c1220] border border-[#22304c] hover:border-indigo-500/50 disabled:opacity-50 text-slate-200 font-mono text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Cloud className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                <span className="font-bold text-indigo-300">
+                  {isSubmitting && selectedDecision === 'use_cloud' ? 'LOADING CLOUD...' : '[Use Cloud]'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-normal font-sans hidden sm:inline">
+                  — Use cloud ({analysis.cloudSummary.count} {analysis.cloudSummary.count === 1 ? 'stream' : 'streams'}) and replace local
+                </span>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-300 transition-colors" />
+            </button>
+
+            {/* 3. [Merge] */}
             <button
               type="button"
               disabled={isSubmitting}
@@ -154,48 +192,10 @@ export const SyncOrbitModal: React.FC<SyncOrbitModalProps> = ({
                   {isSubmitting && selectedDecision === 'merge' ? 'MERGING...' : '[Merge]'}
                 </span>
                 <span className="text-[11px] text-cyan-100 font-normal font-sans hidden sm:inline">
-                  — Combine unique feeds from both
+                  — Combine unique streams from both without duplicates
                 </span>
               </div>
               <ArrowRight className="w-4 h-4 text-cyan-200 group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            {/* 2. Use Local */}
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleChoose('use_local')}
-              className="w-full py-2.5 px-4 rounded bg-[#101728] hover:bg-[#141e33] active:bg-[#0c1220] border border-[#22304c] hover:border-cyan-500/40 disabled:opacity-50 text-slate-200 font-mono text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <HardDrive className="w-4 h-4 text-slate-400" />
-                <span>
-                  {isSubmitting && selectedDecision === 'use_local' ? 'SAVING LOCAL...' : '[Use Local]'}
-                </span>
-                <span className="text-[11px] text-slate-400 font-normal font-sans hidden sm:inline">
-                  — Keep local streams ({analysis.localSummary.count}) & push to Atlas
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-400 font-mono">Overwrite Cloud</span>
-            </button>
-
-            {/* 3. Use Cloud */}
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleChoose('use_cloud')}
-              className="w-full py-2.5 px-4 rounded bg-[#101728] hover:bg-[#141e33] active:bg-[#0c1220] border border-[#22304c] hover:border-indigo-500/40 disabled:opacity-50 text-slate-200 font-mono text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <Cloud className="w-4 h-4 text-slate-400" />
-                <span>
-                  {isSubmitting && selectedDecision === 'use_cloud' ? 'LOADING CLOUD...' : '[Use Cloud]'}
-                </span>
-                <span className="text-[11px] text-slate-400 font-normal font-sans hidden sm:inline">
-                  — Discard local & restore from Atlas ({analysis.cloudSummary.count})
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-400 font-mono">Overwrite Local</span>
             </button>
           </div>
         </div>

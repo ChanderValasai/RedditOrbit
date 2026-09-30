@@ -11,15 +11,19 @@ import {
   Shield,
   LogIn,
   RefreshCw,
+  Layers,
+  Layout,
 } from 'lucide-react';
 import { OrbitLogo } from './OrbitLogo';
 import { PRESET_DASHBOARDS } from '../data/mockStreams';
-import { StreamDensity } from '../types/orbit';
+import { StreamDensity, UserDashboard } from '../types/orbit';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   currentDashboardId: string;
+  dashboards?: UserDashboard[];
   onSelectDashboard: (presetId: string) => void;
+  onOpenDashboardManager?: () => void;
   onOpenAddStream: () => void;
   onOpenSearch: () => void;
   density: StreamDensity;
@@ -30,7 +34,9 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   currentDashboardId,
+  dashboards = [],
   onSelectDashboard,
+  onOpenDashboardManager,
   onOpenAddStream,
   onOpenSearch,
   density,
@@ -45,8 +51,24 @@ export const Header: React.FC<HeaderProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
+  const availableDashboards: Array<{ id: string; name: string; description?: string; streamCount?: number }> =
+    dashboards.length > 0
+      ? dashboards.map((d) => ({
+          id: d.id,
+          name: d.name,
+          description: d.description || `${(d.streams || []).length} streams`,
+          streamCount: (d.streams || []).length,
+        }))
+      : PRESET_DASHBOARDS.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          streamCount: p.streamNames.length,
+        }));
+
   const activeDashboard =
-    PRESET_DASHBOARDS.find((d) => d.id === currentDashboardId) || PRESET_DASHBOARDS[0];
+    availableDashboards.find((d) => d.id === currentDashboardId) ||
+    availableDashboards[0] || { id: 'default', name: 'Workspace', streamCount: 0 };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -74,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full h-13 bg-[#080b12]/95 backdrop-blur-md border-b border-[#181f2f] px-3.5 sm:px-6 flex items-center justify-between">
       {/* Zone 1: Brand & Logo with technical system breadcrumb */}
-      <div className="flex items-center gap-4 lg:gap-6">
+      <div className="flex items-center gap-3 sm:gap-4 lg:gap-6">
         <a
           href="#"
           onClick={(e) => e.preventDefault()}
@@ -86,8 +108,8 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Technical Divider */}
         <div className="hidden sm:block h-4 w-px bg-[#1e273a]" />
 
-        {/* Dashboard Preset Selector */}
-        <div className="relative hidden md:block" ref={dropdownRef}>
+        {/* Dashboard Workspace Selector */}
+        <div className="relative" ref={dropdownRef}>
           <button
             type="button"
             onClick={() => setIsPresetsOpen(!isPresetsOpen)}
@@ -96,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
             aria-haspopup="true"
           >
             <span className="text-cyan-400 text-[10px] font-bold">WORKSPACE:</span>
-            <span className="truncate max-w-[170px] text-slate-200 font-medium font-sans">
+            <span className="truncate max-w-[130px] sm:max-w-[170px] text-slate-200 font-medium font-sans">
               {activeDashboard.name}
             </span>
             <ChevronDown
@@ -105,44 +127,76 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {isPresetsOpen && (
-            <div className="absolute left-0 mt-1.5 w-72 bg-[#0e1320] border border-[#242e44] rounded shadow-2xl py-1 z-50 divide-y divide-[#171f30]">
+            <div className="absolute left-0 mt-1.5 w-80 bg-[#0e1320] border border-[#242e44] rounded shadow-2xl py-1 z-50 divide-y divide-[#171f30]">
               <div className="px-3 py-1.5 text-[10px] uppercase font-mono tracking-widest text-slate-400 flex items-center justify-between">
                 <span>ORBIT WORKSPACES</span>
-                <span className="text-cyan-400 font-mono text-[9px]">3 PRESETS</span>
+                <span className="text-cyan-400 font-mono text-[9px]">
+                  {availableDashboards.length} DECKS
+                </span>
               </div>
-              <div className="py-1">
-                {PRESET_DASHBOARDS.map((preset) => (
+
+              <div className="py-1 max-h-64 overflow-y-auto orbit-scroll">
+                {availableDashboards.map((dash) => (
                   <button
-                    key={preset.id}
+                    key={dash.id}
                     onClick={() => {
-                      onSelectDashboard(preset.id);
+                      onSelectDashboard(dash.id);
                       setIsPresetsOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors flex flex-col group ${
-                      preset.id === currentDashboardId
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors flex flex-col group cursor-pointer ${
+                      dash.id === currentDashboardId
                         ? 'bg-cyan-500/10 text-cyan-300 font-semibold border-l-2 border-l-cyan-400'
                         : 'text-slate-300 hover:bg-[#141b2c] hover:text-white border-l-2 border-l-transparent'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium">{preset.name}</span>
-                      {preset.id === currentDashboardId && (
-                        <span className="text-[10px] font-mono text-cyan-400">ACTIVE</span>
-                      )}
+                      <span className="font-medium truncate max-w-[190px]">{dash.name}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-500">
+                          {dash.streamCount} {dash.streamCount === 1 ? 'stream' : 'streams'}
+                        </span>
+                        {dash.id === currentDashboardId && (
+                          <span className="text-[9px] font-mono text-cyan-400 px-1 bg-cyan-950/80 rounded border border-cyan-500/30">
+                            ACTIVE
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-[11px] text-slate-400 truncate mt-0.5">
-                      {preset.description}
-                    </span>
+                    {dash.description && (
+                      <span className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {dash.description}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
+
+              {/* Manage / Create New Workspace Button */}
+              {onOpenDashboardManager && (
+                <div className="p-1.5 bg-[#090d16]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPresetsOpen(false);
+                      onOpenDashboardManager();
+                    }}
+                    className="w-full py-1.5 px-3 text-left text-xs font-mono text-cyan-300 hover:text-white hover:bg-cyan-950/40 border border-cyan-500/30 hover:border-cyan-400 rounded transition-colors flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>MANAGE WORKSPACES</span>
+                    </div>
+                    <span className="text-[10px] text-cyan-400 font-mono">+ NEW</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
       {/* Zone 2: Command Search trigger */}
-      <div className="flex-1 max-w-sm lg:max-w-md mx-3 sm:mx-6 hidden sm:block">
+      <div className="flex-1 max-w-sm lg:max-w-md mx-3 sm:mx-6 hidden md:block">
         <button
           type="button"
           onClick={onOpenSearch}
@@ -175,7 +229,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           onClick={onOpenSearch}
-          className="sm:hidden p-1.5 text-slate-400 hover:text-white hover:bg-[#131929] border border-transparent rounded transition-colors"
+          className="md:hidden p-1.5 text-slate-400 hover:text-white hover:bg-[#131929] border border-transparent rounded transition-colors"
           title="Search"
           aria-label="Search"
         >
@@ -223,7 +277,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-1.5 w-56 bg-[#0c101c] border border-[#222d44] rounded shadow-2xl py-1 z-50 divide-y divide-[#182236]">
+              <div className="absolute right-0 mt-1.5 w-60 bg-[#0c101c] border border-[#222d44] rounded shadow-2xl py-1 z-50 divide-y divide-[#182236]">
                 <div className="px-3 py-2">
                   <p className="text-xs font-semibold text-slate-200 truncate">{user.displayName}</p>
                   <p className="text-[11px] font-mono text-cyan-400 truncate mt-0.5">{user.email}</p>
@@ -237,6 +291,19 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="py-1">
+                  {onOpenDashboardManager && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onOpenDashboardManager();
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-[#141d2e] flex items-center gap-2 transition-colors cursor-pointer font-mono"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Workspace Manager</span>
+                    </button>
+                  )}
                   {onTriggerSync && (
                     <button
                       type="button"
@@ -259,7 +326,7 @@ export const Header: React.FC<HeaderProps> = ({
                     className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-[#141d2e] flex items-center gap-2 transition-colors"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Workspace Settings</span>
+                    <span>Display Settings</span>
                   </button>
                   <button
                     type="button"

@@ -37,3 +37,12 @@ export interface DashboardPreset {
   streamNames: string[];
 }
 
+export interface UserDashboard {
+  id: string;
+  name: string;
+  description?: string;
+  streams: SubredditStream[];
+  isDefault?: boolean;
+  createdAt?: string;
+  userId?: string;
+}
